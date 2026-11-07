@@ -89,7 +89,11 @@ proceed further.
 
 # Conventions and Definitions
 
-{::boilerplate bcp14-tagged}
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+"SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+"OPTIONAL" in this document are to be interpreted as described in
+BCP 14 [@!RFC2119] [@!RFC8174] when, and only when, they appear in all
+capitals, as shown here.
 
 This document uses the following terms:
 
@@ -712,6 +716,28 @@ Delay selection:
 This document builds on the work of Marten Seemann and Eric Kinnear in
 [@?I-D.seemann-quic-nat-traversal]. The stateless approach was suggested
 by Christian Huitema in [@?ISSUE20].
+
+<reference anchor="RFC2119" target="https://www.rfc-editor.org/info/rfc2119">
+  <front>
+    <title>Key words for use in RFCs to Indicate Requirement Levels</title>
+    <author initials="S." surname="Bradner" fullname="S. Bradner"/>
+    <date year="1997" month="March"/>
+  </front>
+  <seriesInfo name="BCP" value="14"/>
+  <seriesInfo name="RFC" value="2119"/>
+  <seriesInfo name="DOI" value="10.17487/RFC2119"/>
+</reference>
+
+<reference anchor="RFC8174" target="https://www.rfc-editor.org/info/rfc8174">
+  <front>
+    <title>Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words</title>
+    <author initials="B." surname="Leiba" fullname="B. Leiba"/>
+    <date year="2017" month="May"/>
+  </front>
+  <seriesInfo name="BCP" value="14"/>
+  <seriesInfo name="RFC" value="8174"/>
+  <seriesInfo name="DOI" value="10.17487/RFC8174"/>
+</reference>
 
 <reference anchor="RFC9000" target="https://www.rfc-editor.org/info/rfc9000">
   <front>
