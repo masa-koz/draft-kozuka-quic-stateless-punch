@@ -12,8 +12,8 @@ connected through a relay establish a direct path between them when one
 or both are behind Network Address Translators (NATs). The client asks
 the server, over the existing connection, to send a single small &quot;punch&quot;
 packet toward one of the client's address candidates. The server keeps
-no per-attempt state and never initiates path validation. After a short
-delay, the client validates the direct path using ordinary
+no per-attempt state and does not initiate validation of candidate
+paths. After a short delay, the client validates the direct path using ordinary
 client-initiated path validation as defined in RFC 9000, or ordinary
 path creation as defined in RFC 10069 when QUIC multipath is in use,
 and can then migrate the connection to it. 
@@ -1093,8 +1093,8 @@ connected through a relay establish a direct path between them when one
 or both are behind Network Address Translators (NATs). The client asks
 the server, over the existing connection, to send a single small "punch"
 packet toward one of the client's address candidates. The server keeps
-no per-attempt state and never initiates path validation. After a short
-delay, the client validates the direct path using ordinary
+no per-attempt state and does not initiate validation of candidate
+paths. After a short delay, the client validates the direct path using ordinary
 client-initiated path validation as defined in RFC 9000, or ordinary
 path creation as defined in RFC 10069 when QUIC multipath is in use,
 and can then migrate the connection to it.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
@@ -1273,8 +1273,11 @@ based on a design suggested by Christian Huitema in the discussion of
 that draft <span>[<a href="#ISSUE20" class="cite xref">ISSUE20</a>]</span>. The server's only extension-specific action is
 to send one small, opaque packet per request. This packet creates the
 binding in the server-side NAT or firewall; it is not expected to be
-processed by the client. All path validation is initiated by the client
-and follows <span>[<a href="#RFC9000" class="cite xref">RFC9000</a>]</span> (or <span>[<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>) without modification.<a href="#section-1-3" class="pilcrow">¶</a></p>
+processed by the client. Validation of each candidate path is initiated
+by the client and follows <span>[<a href="#RFC9000" class="cite xref">RFC9000</a>]</span> (or <span>[<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>) without
+modification. The only path validation the server performs is the
+ordinary validation of the client's address when the client migrates
+to a validated path (<a href="#migration" class="auto internal xref">Section 8</a>).<a href="#section-1-3" class="pilcrow">¶</a></p>
 <p id="section-1-4">The design has the following properties:<a href="#section-1-4" class="pilcrow">¶</a></p>
 <ul class="compact">
 <li class="compact" id="section-1-5.1">The server keeps no per-attempt state.<a href="#section-1-5.1" class="pilcrow">¶</a>
@@ -1983,7 +1986,7 @@ and differ only in how probing is coordinated.<a href="#appendix-A-1" class="pil
         </thead>
         <tbody>
           <tr>
-            <td class="text-left" rowspan="1" colspan="1">Server-initiated validation</td>
+            <td class="text-left" rowspan="1" colspan="1">Server-initiated validation of candidate paths</td>
             <td class="text-left" rowspan="1" colspan="1">Yes</td>
             <td class="text-left" rowspan="1" colspan="1">No</td>
           </tr>
