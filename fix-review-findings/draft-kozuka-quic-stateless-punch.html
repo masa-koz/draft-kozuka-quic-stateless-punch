@@ -1,0 +1,2193 @@
+<!DOCTYPE html>
+<html lang="en" class="Internet-Draft">
+<head>
+<meta charset="utf-8">
+<meta content="Common,Latin" name="scripts">
+<meta content="initial-scale=1.0" name="viewport">
+<title>Stateless Server-Assisted Hole Punching for QUIC</title>
+<meta content="Masahiro Kozuka" name="author">
+<meta content="
+       This document specifies a QUIC extension that lets two endpoints
+connected through a relay establish a direct path between them when one
+or both are behind Network Address Translators (NATs). The client asks
+the server, over the existing connection, to send a single small &quot;punch&quot;
+packet toward one of the client's address candidates. The server keeps
+no per-attempt state and never initiates path validation. After a short
+delay, the client validates the direct path using ordinary
+client-initiated path validation as defined in RFC 9000, or ordinary
+path creation when QUIC multipath is in use, and can then migrate the
+connection to it. 
+    " name="description">
+<meta content="xml2rfc 3.35.0" name="generator">
+<meta content="QUIC" name="keyword">
+<meta content="NAT traversal" name="keyword">
+<meta content="hole punching" name="keyword">
+<meta content="connection migration" name="keyword">
+<meta content="draft-kozuka-quic-stateless-punch-latest" name="ietf.draft">
+<!-- Generator version information:
+  xml2rfc 3.35.0
+    Python 3.14.10
+    ConfigArgParse 1.9.0
+    google-i18n-address 3.1.1
+    intervaltree 3.2.1
+    Jinja2 3.1.6
+    lxml 6.1.1
+    natsort 8.4.0
+    platformdirs 4.14.3
+    pycountry 24.6.1
+    PyYAML 6.0.3
+    requests 2.33.1
+    wcwidth 0.9.4
+-->
+<link href="draft-kozuka-quic-stateless-punch.xml" rel="alternate" type="application/rfc+xml">
+<link href="#copyright" rel="license">
+<style type="text/css">@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-cyrillic.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-cyrillic.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local('Lora SemiBold'), local('Lora-SemiBold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-semibold-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Oxygen Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Oxygen Mono'), local('OxygenMono-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/oxygenmono-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Oxygen Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Oxygen Mono'), local('OxygenMono-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/oxygenmono-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  color-scheme: light dark;
+  --background-color: #fff;
+  --text-color: #222;
+  --title-color: #191919;
+  --link-color: #2a6496;
+  --highlight-color: #f9f9f9;
+  --line-color: #eee;
+  --pilcrow-weak: #ddd;
+  --pilcrow-strong: #bbb;
+  --small-font-size: 14.5px;
+  --font-mono: 'Oxygen Mono', monospace;
+  --font-title: "Sofia Sans Semi Condensed", sans-serif;
+  scrollbar-color: #bbb #eee;
+}
+body {
+  max-width: 600px;
+  margin: 75px auto;
+  padding: 0 5px;
+  color: var(--text-color);
+  background-color: var(--background-color);
+  font: 16px/22px "Lora", serif;
+  scroll-behavior: smooth;
+}
+
+.ears {
+  display: none;
+}
+
+/* headings */
+section {
+  clear: both;
+}
+.section-number {
+  padding-right: 0.5em;
+}
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-title);
+  font-weight: 680;
+  margin: 0.8em 0 0.3em;
+  font-size-adjust: 0.5;
+  color: var(--title-color);
+}
+h1 {
+  &#title {
+    font-size: 32px;
+    line-height: 40px;
+    clear: both;
+    margin: 1.5em 0 0.2em;
+  }
+  &#rfcnum {
+    margin: 1.5em 0 0.2em;
+    & + h1#title {
+      margin: 0.2em 0;
+    }
+  }
+}
+
+h1, h2, h3 {
+  font-size: 22px;
+  line-height: 27px;
+}
+h4, h5, h6 {
+  font-size: 20px;
+  line-height: 24px;
+}
+
+/* general structure */
+.author {
+  padding-bottom: 0.3em;
+  vertical-align: top;
+}
+#abstract+p {
+  font-size: 18px;
+  line-height: 24px;
+  & code, & samp, & tt {
+    font-size: 16px;
+    line-height: 0;
+  }
+}
+
+p {
+  padding: 0;
+  margin: 0.5em 0;
+  text-align: left;
+}
+div {
+  margin: 0;
+}
+.alignRight {
+  margin: 1em 0;
+  &.art-text {
+    background-color: var(--highlight-color);
+    border: 1px solid var(--line-color);
+    border-radius: 3px;
+    padding: 0.5em 1em 0;
+    margin-bottom: 0.5em;
+    & pre {
+      padding: 0;
+      width: auto;
+    }
+  }
+  & > *:first-child {
+    border: none;
+    margin: 0;
+    float: right;
+    clear: both;
+  }
+  & > *:nth-child(2) {
+    clear: both;
+    display: block;
+    border: none;
+  }
+}
+svg {
+  display: block;
+  /* font-family isn't space-separated, but =~ will have to do */
+  &[font-family~="monospace" i], & [font-family~="monospace" i] {
+    font-family: var(--font-mono);
+  }
+}
+.alignCenter {
+  margin: 1em 0;
+  &.art-text {
+    background-color: var(--highlight-color);
+    border: 1px solid var(--line-color);
+    border-radius: 3px;
+    padding: 0.5em 1em 0;
+    margin-bottom: 0.5em;
+    & pre {
+      padding: 0;
+      width: auto;
+    }
+  }
+  & > *:first-child {
+    border: none;
+    /* this isn't optimal, but it's an existence proof.  PrinceXML doesn't
+       support flexbox yet.
+    */
+    display: table;
+    margin: 0 auto;
+  }
+}
+
+/* lists */
+ol, ul {
+  padding: 0;
+  margin: 0 0 0.5em 2em;
+  & :is(ol, ul) {
+    margin-left: 1em;
+  }
+}
+li {
+  margin: 0 0 0.25em 0;
+}
+ul.empty, .ulEmpty {
+  list-style-type: none;
+  & li {
+    margin-top: 0.5em;
+  }
+}
+:is(ul, ol).compact, .ulCompact, .olCompact {
+  margin: 0 0 0 2em;
+  & li {
+    margin: 0;
+    & :first-child { margin-top: 0; }
+    & :last-child { margin-bottom: 0; }
+  }
+}
+
+/* definition lists */
+dl {
+  clear: left;
+  --indent: 3ch;
+  /* --indent: attr(indent ch); not supported in any browser, but we can dream */
+  &.olPercent {
+    --indent: 5ch;
+    & > dt {
+      min-width: calc(var(--indent) - 2ch);
+      float: none;
+    }
+  }
+
+  dl > dd > & {
+    margin-top: 0.5em;
+    margin-bottom: 0;
+  }
+
+  &:not(.dlNewline) > dt {
+    float: left;
+    margin-right: 2ch;
+    min-width: 8ch;
+  }
+  & > dd {
+    margin-bottom: .8em;
+    margin-left: var(--indent) !important; /* stupid element overrides */
+    min-height: 2ex;
+  }
+}
+:is(dl.compact, .dlCompact) > dd {
+  margin-bottom: 0;
+  & > :is(:first-child, .break:first-child + *) {
+    margin-top: 0;
+  }
+  & > :is(:last-child) {
+    margin-bottom: 0;
+  }
+}
+:is(dd, span).break {
+  display: none;
+}
+
+/* links */
+a {
+  text-decoration: none;
+  &[href] {
+    color: var(--link-color);
+    &:hover { text-decoration: underline; }
+    &.selfRef {
+      color: var(--text-color);
+      &:hover {
+        text-decoration: none;
+        background-color: var(--highlight-color);
+      }
+    }
+  }
+}
+.iref + a[href].internal {
+  color: var(--text-color);
+}
+a.xref:is(.cite, .auto), :is(#status-of-memo, #copyright) a {
+  white-space: nowrap;
+}
+
+/* Figures */
+tt, code, pre {
+  background-color: var(--highlight-color);
+  font: 14px/22px var(--font-mono);
+}
+tt, code {
+  /* changing the font for inline elements leads to different ascender
+     and descender heights; as we want to retain baseline alignment,
+     remove leading to avoid altering the final height of lines
+     note: this fails if these blocks take an entire line,
+     a different solution would be great */
+  line-height: 0;
+}
+:is(h1, h2, h3, h4, h5, h6) :is(tt, code) {
+  font-size: 84%;
+}
+pre {
+  border: 1px solid var(--line-color);
+  font-size: 13.5px;
+  line-height: 16px;
+  letter-spacing: -0.2px;
+  margin: 5px;
+  padding: 5px;
+}
+img {
+  max-width: 100%;
+}
+figure {
+  margin: 0.5em 0;
+  padding: 0;
+  & blockquote {
+    margin: 0.8em 0.4em 0.4em;
+  }
+}
+figcaption, caption {
+  font-style: italic;
+  margin: 0.5em 1.5em;
+  text-align: left;
+  caption-side: bottom;
+}
+@media screen {
+  /* Auto-collapse boilerplate. */
+  :is(#status-of-memo, #copyright) {
+    & p {
+      margin: -2px 0;
+      max-height: 0;
+      transition: max-height 2s ease, margin 0.5s ease 0.5s;
+      overflow: hidden;
+    }
+    &:hover p,
+    & h2:target ~ p {
+      margin: 0.5em 0;
+      max-height: 500px;
+      overflow: auto;
+    }
+  }
+  pre, svg {
+    display: inline-block;
+    /* In the horizontal direction, sometimes people make over-sized figures.
+       Scrollbars for those is therefore necessary: auto adds them as necessary..
+       In the vertical direction, the line-height can combine with the font
+       asender/descender height to produce scrollbars: hidden avoids that. */
+    overflow: auto hidden;
+  }
+  pre {
+    max-width: 100%;
+    width: calc(100% - 22px - 1em);
+  }
+  svg {
+    max-width: calc(100% - 22px - 1em);
+  }
+  figure pre {
+    display: block;
+    width: calc(100% - 25px);
+  }
+  :is(pre, svg) + .pilcrow {
+    display: inline-block;
+    vertical-align: text-bottom;
+    padding-bottom: 8px;
+  }
+}
+
+/* aside, blockquote */
+aside, blockquote {
+  margin-left: 0;
+  padding: 0 2em;
+  font-style: italic;
+}
+blockquote {
+  margin: 1em 0;
+  border-left: 2px var(--pilcrow-strong) solid;
+}
+cite {
+  display: block;
+  text-align: right;
+  font-style: italic;
+}
+
+/* tables */
+table {
+  width: auto;
+  max-width: 100%;
+  margin: 0 0 1em;
+  border-collapse: collapse;
+  &.right { margin-left: auto; }
+  &.center { margin-left: auto; margin-right: auto; }
+  &.left { margin-right: auto; }
+  & .text-left { text-align: left; }
+  & .text-center { text-align: center; }
+  & .text-right { text-align: right; }
+  & caption {
+    margin: 0;
+    padding: 3px 0 3px 1em;
+  }
+  & p { margin: 0; }
+}
+
+thead, tbody {
+  border: 1px solid var(--line-color);
+}
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 5px 10px;
+}
+th {
+  background-color: var(--line-color);
+}
+:is(tr:nth-child(2n), thead+tbody > tr:nth-child(2n+1)) > td {
+  background-color: var(--background-color);
+}
+:is(tr:nth-child(2n+1), thead+tbody > tr:nth-child(2n)) > td {
+  background-color: var(--highlight-color);
+}
+
+/* pilcrow */
+a.pilcrow {
+  margin-left: 3px;
+  opacity: 0.2;
+  user-select: none;
+  &[href] {
+    color: var(--pilcrow-weak);
+    &:hover { text-decoration: none; }
+  }
+  @media not print {
+    :hover > &, &:focus {
+      opacity: 1;
+    }
+    &[href]:hover {
+      color: var(--pilcrow-strong);
+      background-color: transparent;
+    }
+  }
+  @media print {
+    display: none;
+  }
+}
+
+/* misc */
+hr {
+  border: 0;
+  border-top: 1px solid var(--line-color);
+}
+.bcp14 {
+  font-variant: small-caps;
+  font-weight: 600;
+  font-size: var(--small-font-size);
+}
+.role {
+  font-variant: all-small-caps;
+}
+sub, sup {
+  line-height: 1;
+  font-size: 80%;
+}
+
+/* info block */
+#identifiers {
+  margin: 0;
+  font-size: var(--small-font-size);
+  line-height: 18px;
+  --identifier-width: 15ch;
+  & dt {
+    width: var(--identifier-width);
+    min-width: var(--identifier-width);
+    clear: left;
+    float: left;
+    text-align: right;
+    margin-right: 1ch;
+  }
+  & dd {
+    margin: 0;
+    margin-left: calc(1em + var(--identifier-width)) !important;
+    min-width: 5em;
+  }
+  & .authors {
+    & .author {
+      display: inline-block;
+      margin-right: 1.5em;
+    }
+    & .org {
+      font-style: italic;
+    }
+  }
+}
+
+/* The prepared/rendered info at the very bottom of the page */
+.docInfo {
+  color: #999;
+  font-size: 0.9em;
+  font-style: italic;
+  margin-top: 2em;
+  & .prepared {
+    float: right;
+  }
+}
+
+/* table of contents */
+#toc {
+  padding: 0.75em 0 2em 0;
+  margin-bottom: 1em;
+
+  & nav {
+    & ul {
+      margin: 0 0.5em 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    & li {
+      line-height: 1.3em;
+      margin: 2px 0;
+      padding-left: 1.2em;
+      text-indent: -1.2em;
+    }
+  }
+  & a.xref {
+    white-space: normal;
+  }
+}
+
+.references {
+  & > dt {
+    text-align: right;
+    font-weight: bold;
+    min-width: 10ch;
+    margin-right: 1.5ch;
+    &:target::before {
+      content: "⇒";
+      margin: 0 10px 0 -25px;
+    }
+  }
+  & > dd {
+    margin-left: 12ch !important;
+    overflow: visible;
+    & .refInstance {
+      margin-bottom: 0.8em;
+    }
+    & .ascii {
+      margin-bottom: 0.25em;
+    }
+  }
+}
+
+#rfc\.index\.index + ul {
+  margin-left: 0;
+}
+
+/* authors */
+address.vcard {
+  font-style: normal;
+  max-width: 20em;
+  margin: 1em auto 1em 0;
+
+  & .nameRole {
+    font-weight: 700;
+    margin-left: 0;
+  }
+  & .label {
+    margin: 0.5em 0;
+  }
+  & .type {
+    display: none;
+  }
+  & .alternative-contact {
+    margin: 0.5em 0 0.25em 0;
+  }
+  & .non-ascii {
+    margin: 0 0 0 2em;
+  }
+  & div.left {
+    text-align: left;
+  }
+  & div.right {
+    text-align: right;
+  }
+}
+
+hr.addr {
+  border-top: 1px dashed;
+  margin: 0;
+  color: #ddd;
+  max-width: calc(100% - 16px);
+}
+@media (min-width: 500px) {
+  #authors-addresses {
+    & > section {
+      column-count: 2;
+      column-gap: 20px;
+    }
+    & > section > h2 {
+      column-span: all;
+    }
+    /* hack for break-inside: avoid-column */
+    & address {
+      display: inline-block;
+      break-inside: avoid-column;
+    }
+  }
+}
+
+/* Comments */
+.rfcEditorRemove {
+  & p:first-of-type {
+    font-style: italic;
+  }
+}
+.cref {
+  background-color: rgba(249, 232, 105, 0.3);
+  padding: 2px 4px;
+}
+.crefSource {
+  font-style: italic;
+}
+
+@media screen {
+  #toc {
+    & nav {
+      font-family: var(--font-title);
+      font-weight: 360;
+      & > ul { margin-bottom: 2em; }
+      & ul {
+        margin: 0 0 0 4px;
+        & :is(p, li) {
+          margin: 2px 0;
+        }
+      }
+    }
+    & a.toplink {
+      float: right;
+    }
+  }
+}
+@media not screen {
+  #toc a.toplink {
+    display: none;
+  }
+}
+
+
+/* TOC layout for smaller screens */
+@media screen and (max-width: 929px) {
+  #toc {
+    position: fixed;
+    z-index: 2;
+    top: 0;
+    right: 0;
+    padding: 1px 0 0 0;
+    margin: 0;
+    border-bottom: 1px solid #ccc;
+    opacity: 0.6;
+    & h2 {
+      margin: 0;
+      padding: 2px 0 2px 6px;
+      padding-right: 1em;
+      font-size: 18px;
+      line-height: 24px;
+      min-width: 190px;
+      text-align: right;
+      background-color: #444;
+      color: white;
+      cursor: pointer;
+      &::before { /* css hamburger */
+        float: right;
+        position: relative;
+        width: 1em;
+        height: 1px;
+        left: -164px;
+        margin: 8px 0 0 0;
+        background: white none repeat scroll 0 0;
+        box-shadow: 0 4px 0 0 white, 0 8px 0 0 white;
+        content: "";
+      }
+    }
+    & nav {
+      display: none;
+      background-color: var(--background-color);
+      padding: 0.5em 1em 1em;
+      overflow: auto;
+      overscroll-behavior: contain;
+      height: calc(100vh - 48px);
+      border-left: 1px solid #ddd;
+    }
+    &.active {
+      opacity: 1;
+      & nav { display: block; }
+    }
+    /* Make the collapsed ToC header render white on gray also when it's a link */
+    & h2 a,
+    & h2 a:is(:link, :focus, :hover),
+    & a.toplink,
+    & a.toplink:hover {
+      color: white;
+      background-color: #444;
+      text-decoration: none;
+    }
+    & a.toplink {
+      margin: 2px 0.5em 0;
+    }
+  }
+}
+
+/* TOC layout for wide screens */
+@media screen and (min-width: 930px) {
+  body {
+    padding-right: 360px;
+    padding-right: calc(min(180px + 20%, 500px));
+  }
+  #toc {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    right: calc(50vw - 480px);
+    width: 312px;
+    margin: 0;
+    padding: 0;
+    z-index: 1;
+    & h2 {
+      margin: 0;
+      padding: 0.25em 1em 1em 0;
+    }
+    & nav {
+      display: block;
+      height: calc(90vh - 84px);
+      bottom: 0;
+      padding: 0.5em 0 2em;
+      overflow: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+    }
+    & a.toplink {
+      margin: 8px 0.5em 0;
+    }
+  }
+  img { /* future proofing */
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* pagination */
+@media print {
+  body {
+    width: 100%;
+  }
+  p {
+    orphans: 3;
+    widows: 3;
+  }
+  #n-copyright-notice {
+    border-bottom: none;
+  }
+  #toc {
+    page-break-before: always;
+    border-top: none;
+    padding-top: 0;
+  }
+  #n-introduction {
+    page-break-before: always;
+  }
+  figure, pre, .vcard {
+    page-break-inside: avoid;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+  }
+  :is(h2, h3, h4, h5, h6)+*, dd {
+    page-break-before: avoid;
+  }
+  pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 10pt;
+  }
+  table {
+    border: 1px solid #ddd;
+  }
+  td {
+    border-top: 1px solid #ddd;
+  }
+}
+
+@page :first {
+  padding-top: 0;
+  @top-left {
+    content: normal;
+    border: none;
+  }
+  @top-center {
+    content: normal;
+    border: none;
+  }
+  @top-right {
+    content: normal;
+    border: none;
+  }
+}
+
+@page {
+  size: A4;
+  margin-bottom: 45mm;
+  padding-top: 20px;
+}
+
+/* Dark mode. */
+@media (prefers-color-scheme: dark) {
+:root {
+  --background-color: #121212;
+  --text-color: #f0f0f0;
+  --title-color: #fff;
+  --link-color: #4da4f0;
+  --highlight-color: #282828;
+  --line-color: #444;
+  --pilcrow-weak: #444;
+  --pilcrow-strong: #666;
+  scrollbar-color: #777 #333;
+}
+}
+
+/* SVG Trick: a prefix match works because only black and white are allowed */
+svg {
+  & :is([stroke="black"], [stroke^="#000"]) {
+    stroke: var(--text-color);
+  }
+  & :is([stroke="white"], [stroke^="#fff"]) {
+    stroke: var(--background-color);
+  }
+  & :is([fill="black"], [fill^="#000"], :not([fill], [fill] *)) {
+    fill: var(--text-color);
+  }
+  & :is([fill="white"], [fill^="#fff"]) {
+    fill: var(--background-color);
+  }
+}
+</style>
+
+</head>
+<body class="xml2rfc">
+<table class="ears">
+<thead><tr>
+<td class="left">Internet-Draft</td>
+<td class="center">QUIC Stateless Punch</td>
+<td class="right">November 2026</td>
+</tr></thead>
+<tfoot><tr>
+<td class="left">Kozuka</td>
+<td class="center">Expires 11 May 2027</td>
+<td class="right">[Page]</td>
+</tr></tfoot>
+</table>
+<div id="external-metadata" class="document-information"></div>
+<div id="internal-metadata" class="document-information">
+<dl id="identifiers">
+<dt class="label-workgroup">Workgroup:</dt>
+<dd class="workgroup">QUIC</dd>
+<dt class="label-internet-draft">Internet-Draft:</dt>
+<dd class="internet-draft">draft-kozuka-quic-stateless-punch-latest</dd>
+<dt class="label-published">Published:</dt>
+<dd class="published">
+<time datetime="2026-11-07" class="published">7 November 2026</time>
+    </dd>
+<dt class="label-intended-status">Intended Status:</dt>
+<dd class="intended-status">Standards Track</dd>
+<dt class="label-expires">Expires:</dt>
+<dd class="expires"><time datetime="2027-05-11">11 May 2027</time></dd>
+<dt class="label-authors">Author:</dt>
+<dd class="authors">
+<div class="author">
+      <div class="author-name">M. Kozuka</div>
+<div class="org">Okayama University</div>
+</div>
+</dd>
+</dl>
+</div>
+<h1 id="title">Stateless Server-Assisted Hole Punching for QUIC</h1>
+<section id="section-abstract">
+      <h2 id="abstract"><a href="#abstract" class="selfRef">Abstract</a></h2>
+<p id="section-abstract-1">This document specifies a QUIC extension that lets two endpoints
+connected through a relay establish a direct path between them when one
+or both are behind Network Address Translators (NATs). The client asks
+the server, over the existing connection, to send a single small "punch"
+packet toward one of the client's address candidates. The server keeps
+no per-attempt state and never initiates path validation. After a short
+delay, the client validates the direct path using ordinary
+client-initiated path validation as defined in RFC 9000, or ordinary
+path creation when QUIC multipath is in use, and can then migrate the
+connection to it.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+</section>
+<section class="note rfcEditorRemove" id="section-note.1">
+      <h2 id="name-discussion-venues">
+<a href="#name-discussion-venues" class="section-name selfRef">Discussion Venues</a>
+      </h2>
+<p id="section-note.1-1">This note is to be removed before publishing as an RFC.<a href="#section-note.1-1" class="pilcrow">¶</a></p>
+<p id="section-note.1-2">Discussion of this document takes place on the
+    QUIC Working Group mailing list (quic@ietf.org),
+    which is archived at <span><a href="https://mailarchive.ietf.org/arch/browse/quic/">https://mailarchive.ietf.org/arch/browse/quic/</a></span>.<a href="#section-note.1-2" class="pilcrow">¶</a></p>
+<p id="section-note.1-3">Source for this draft and an issue tracker can be found at
+    <span><a href="https://github.com/masa-koz/draft-kozuka-quic-stateless-punch">https://github.com/masa-koz/draft-kozuka-quic-stateless-punch</a></span>.<a href="#section-note.1-3" class="pilcrow">¶</a></p>
+</section>
+<div id="status-of-memo">
+<section id="section-boilerplate.1">
+        <h2 id="name-status-of-this-memo">
+<a href="#name-status-of-this-memo" class="section-name selfRef">Status of This Memo</a>
+        </h2>
+<p id="section-boilerplate.1-1">
+        This Internet-Draft is submitted in full conformance with the
+        provisions of BCP 78 and BCP 79.<a href="#section-boilerplate.1-1" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-2">
+        Internet-Drafts are working documents of the Internet Engineering Task
+        Force (IETF). Note that other groups may also distribute working
+        documents as Internet-Drafts. The list of current Internet-Drafts is
+        at <span><a href="https://datatracker.ietf.org/drafts/current/">https://datatracker.ietf.org/drafts/current/</a></span>.<a href="#section-boilerplate.1-2" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-3">
+        Internet-Drafts are draft documents valid for a maximum of six months
+        and may be updated, replaced, or obsoleted by other documents at any
+        time. It is inappropriate to use Internet-Drafts as reference
+        material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-4">
+        This Internet-Draft will expire on 11 May 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="copyright">
+<section id="section-boilerplate.2">
+        <h2 id="name-copyright-notice">
+<a href="#name-copyright-notice" class="section-name selfRef">Copyright Notice</a>
+        </h2>
+<p id="section-boilerplate.2-1">
+            Copyright (c) 2026 IETF Trust and the persons identified as the
+            document authors. All rights reserved.<a href="#section-boilerplate.2-1" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.2-2">
+            This document is subject to BCP 78 and the IETF Trust's Legal
+            Provisions Relating to IETF Documents
+            (<span><a href="https://trustee.ietf.org/license-info">https://trustee.ietf.org/license-info</a></span>) in effect on the date of
+            publication of this document. Please review these documents
+            carefully, as they describe your rights and restrictions with
+            respect to this document. Code Components extracted from this
+            document must include Revised BSD License text as described in
+            Section 4.e of the Trust Legal Provisions and are provided without
+            warranty as described in the Revised BSD License.<a href="#section-boilerplate.2-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="toc">
+<section id="section-toc.1">
+        <a href="#" onclick="scroll(0,0)" class="toplink">▲</a><h2 id="name-table-of-contents">
+<a href="#name-table-of-contents" class="section-name selfRef">Table of Contents</a>
+        </h2>
+<nav class="toc"><ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1">
+            <p id="section-toc.1-1.1.1" class="keepWithNext"><a href="#section-1" class="auto internal xref">1</a>.  <a href="#name-introduction" class="internal xref">Introduction</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2">
+            <p id="section-toc.1-1.2.1" class="keepWithNext"><a href="#section-2" class="auto internal xref">2</a>.  <a href="#name-conventions-and-definitions" class="internal xref">Conventions and Definitions</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3">
+            <p id="section-toc.1-1.3.1" class="keepWithNext"><a href="#section-3" class="auto internal xref">3</a>.  <a href="#name-overview" class="internal xref">Overview</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4">
+            <p id="section-toc.1-1.4.1"><a href="#section-4" class="auto internal xref">4</a>.  <a href="#name-address-candidates" class="internal xref">Address Candidates</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5">
+            <p id="section-toc.1-1.5.1"><a href="#section-5" class="auto internal xref">5</a>.  <a href="#name-punch-requests" class="internal xref">Punch Requests</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.1">
+                <p id="section-toc.1-1.5.2.1.1"><a href="#section-5.1" class="auto internal xref">5.1</a>.  <a href="#name-limits" class="internal xref">Limits</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6">
+            <p id="section-toc.1-1.6.1"><a href="#section-6" class="auto internal xref">6</a>.  <a href="#name-punch-packets" class="internal xref">Punch Packets</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.1">
+                <p id="section-toc.1-1.6.2.1.1"><a href="#section-6.1" class="auto internal xref">6.1</a>.  <a href="#name-receiving-a-punch-packet" class="internal xref">Receiving a Punch Packet</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7">
+            <p id="section-toc.1-1.7.1"><a href="#section-7" class="auto internal xref">7</a>.  <a href="#name-client-initiated-path-valid" class="internal xref">Client-Initiated Path Validation</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8">
+            <p id="section-toc.1-1.8.1"><a href="#section-8" class="auto internal xref">8</a>.  <a href="#name-migration" class="internal xref">Migration</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9">
+            <p id="section-toc.1-1.9.1"><a href="#section-9" class="auto internal xref">9</a>.  <a href="#name-extension-negotiation" class="internal xref">Extension Negotiation</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10">
+            <p id="section-toc.1-1.10.1"><a href="#section-10" class="auto internal xref">10</a>. <a href="#name-punch_me_now-frame" class="internal xref">PUNCH_ME_NOW Frame</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11">
+            <p id="section-toc.1-1.11.1"><a href="#section-11" class="auto internal xref">11</a>. <a href="#name-security-considerations" class="internal xref">Security Considerations</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12">
+            <p id="section-toc.1-1.12.1"><a href="#section-12" class="auto internal xref">12</a>. <a href="#name-iana-considerations" class="internal xref">IANA Considerations</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.1">
+                <p id="section-toc.1-1.12.2.1.1"><a href="#section-12.1" class="auto internal xref">12.1</a>.  <a href="#name-quic-transport-parameter" class="internal xref">QUIC Transport Parameter</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.2">
+                <p id="section-toc.1-1.12.2.2.1"><a href="#section-12.2" class="auto internal xref">12.2</a>.  <a href="#name-quic-frame-types" class="internal xref">QUIC Frame Types</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13">
+            <p id="section-toc.1-1.13.1"><a href="#section-13" class="auto internal xref">13</a>. <a href="#name-references" class="internal xref">References</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13.2.1">
+                <p id="section-toc.1-1.13.2.1.1"><a href="#section-13.1" class="auto internal xref">13.1</a>.  <a href="#name-normative-references" class="internal xref">Normative References</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13.2.2">
+                <p id="section-toc.1-1.13.2.2.1"><a href="#section-13.2" class="auto internal xref">13.2</a>.  <a href="#name-informative-references" class="internal xref">Informative References</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14">
+            <p id="section-toc.1-1.14.1"><a href="#appendix-A" class="auto internal xref">Appendix A</a>.  <a href="#name-comparison-with-draft-seema" class="internal xref">Comparison with draft-seemann-quic-nat-traversal-04</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.15">
+            <p id="section-toc.1-1.15.1"><a href="#appendix-B" class="auto internal xref">Appendix B</a>.  <a href="#name-implementation-status" class="internal xref">Implementation Status</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.15.2.1">
+                <p id="section-toc.1-1.15.2.1.1"><a href="#appendix-B.1" class="auto internal xref">B.1</a>.  <a href="#name-seera-msquic" class="internal xref">SEERA MsQuic</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.16">
+            <p id="section-toc.1-1.16.1"><a href="#appendix-C" class="auto internal xref">Appendix C</a>.  <a href="#name-open-issues" class="internal xref">Open Issues</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.17">
+            <p id="section-toc.1-1.17.1"><a href="#appendix-D" class="auto internal xref"></a><a href="#name-acknowledgments" class="internal xref">Acknowledgments</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.18">
+            <p id="section-toc.1-1.18.1"><a href="#appendix-E" class="auto internal xref"></a><a href="#name-authors-address" class="internal xref">Author's Address</a></p>
+</li>
+        </ul>
+</nav>
+</section>
+</div>
+<div id="introduction">
+<section id="section-1">
+      <h2 id="name-introduction">
+<a href="#section-1" class="section-number selfRef">1. </a><a href="#name-introduction" class="section-name selfRef">Introduction</a>
+      </h2>
+<p id="section-1-1">Two QUIC endpoints that are both behind NATs often cannot reach each
+other directly, but they can establish a connection through a relay,
+for example a proxy that supports
+<span>[<a href="#I-D.ietf-masque-connect-udp-listen" class="cite xref">I-D.ietf-masque-connect-udp-listen</a>]</span>, or a proxy that pairs two
+authenticated clients as defined in
+<span>[<a href="#I-D.seemann-masque-connect-udp-rendezvous" class="cite xref">I-D.seemann-masque-connect-udp-rendezvous</a>]</span>. Once such a relayed
+connection exists, it can carry application data immediately and also
+serve as the signaling channel for discovering a direct path. If a
+direct path is found, the connection can migrate to it
+(<span><a href="https://rfc-editor.org/rfc/rfc9000#section-9" class="relref">Section 9</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>); otherwise, the endpoints keep using the
+relayed path.<a href="#section-1-1" class="pilcrow">¶</a></p>
+<p id="section-1-2"><span>[<a href="#I-D.seemann-quic-nat-traversal" class="cite xref">I-D.seemann-quic-nat-traversal</a>]</span> defines an extension for this
+purpose. In its current form, the server takes an active part in every
+traversal attempt: it accepts grants and requests, sends PATH_CHALLENGE
+probes on unvalidated paths, issues dedicated "punching" connection IDs,
+and reports the result of each attempt.<a href="#section-1-2" class="pilcrow">¶</a></p>
+<p id="section-1-3">This document specifies a smaller alternative for the probing step,
+based on a design suggested by Christian Huitema in the discussion of
+that draft <span>[<a href="#ISSUE20" class="cite xref">ISSUE20</a>]</span>. The server's only extension-specific action is
+to send one small, opaque packet per request. This packet creates the
+binding in the server-side NAT or firewall; it is not expected to be
+processed by the client. All path validation is initiated by the client
+and follows <span>[<a href="#RFC9000" class="cite xref">RFC9000</a>]</span> (or <span>[<a href="#I-D.ietf-quic-multipath" class="cite xref">I-D.ietf-quic-multipath</a>]</span>) without
+modification.<a href="#section-1-3" class="pilcrow">¶</a></p>
+<p id="section-1-4">The design has the following properties:<a href="#section-1-4" class="pilcrow">¶</a></p>
+<ul class="compact">
+<li class="compact" id="section-1-5.1">The server keeps no per-attempt state.<a href="#section-1-5.1" class="pilcrow">¶</a>
+</li>
+        <li class="compact" id="section-1-5.2">The server never sends PATH_CHALLENGE frames on a path before the
+client has validated that path, and each punch packet is no larger
+than the packet carrying the request that caused it.<a href="#section-1-5.2" class="pilcrow">¶</a>
+</li>
+        <li class="compact" id="section-1-5.3">No new type of connection ID is introduced, and no special handling
+is needed when QUIC multipath is used.<a href="#section-1-5.3" class="pilcrow">¶</a>
+</li>
+        <li class="compact" id="section-1-5.4">Only one new frame is defined.<a href="#section-1-5.4" class="pilcrow">¶</a>
+</li>
+      </ul>
+<p id="section-1-6">The cost is additional latency: the client waits roughly one round-trip
+time of the relayed path before sending its first probe.<a href="#section-1-6" class="pilcrow">¶</a></p>
+<p id="section-1-7">Address candidates are advertised using the ALTERNATIVE_ADDRESS frame
+defined in <span>[<a href="#I-D.munizaga-quic-alternative-server-address" class="cite xref">I-D.munizaga-quic-alternative-server-address</a>]</span>, as in
+<span>[<a href="#I-D.seemann-quic-nat-traversal" class="cite xref">I-D.seemann-quic-nat-traversal</a>]</span>. The authors' intention is that this
+document serve as input to the discussion of that draft. If the
+approach described here is adopted there, this document need not
+proceed further.<a href="#section-1-7" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="conventions-and-definitions">
+<section id="section-2">
+      <h2 id="name-conventions-and-definitions">
+<a href="#section-2" class="section-number selfRef">2. </a><a href="#name-conventions-and-definitions" class="section-name selfRef">Conventions and Definitions</a>
+      </h2>
+<p id="section-2-1">{::boilerplate bcp14-tagged}<a href="#section-2-1" class="pilcrow">¶</a></p>
+<p id="section-2-2">This document uses the following terms:<a href="#section-2-2" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlCompact dlParallel" id="section-2-3">
+        <dt id="section-2-3.1">Address candidate:</dt>
+        <dd style="margin-left: 1.5em" id="section-2-3.2">A transport address (IP address and UDP port) at which an endpoint
+might be reachable, as in <span>[<a href="#RFC8445" class="cite xref">RFC8445</a>]</span>.<a href="#section-2-3.2" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-2-3.3">Sending base:</dt>
+        <dd style="margin-left: 1.5em" id="section-2-3.4">The local sending context used for an address candidate, such as a
+UDP socket on a particular network interface or a tunnel. This term
+is borrowed from <span>[<a href="#I-D.seemann-quic-nat-traversal" class="cite xref">I-D.seemann-quic-nat-traversal</a>]</span>.<a href="#section-2-3.4" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-2-3.5">Punch request:</dt>
+        <dd style="margin-left: 1.5em" id="section-2-3.6">A PUNCH_ME_NOW frame (<a href="#frame" class="auto internal xref">Section 10</a>) sent by the client on a validated
+path, asking the server to send a punch packet.<a href="#section-2-3.6" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-2-3.7">Punch packet:</dt>
+        <dd style="margin-left: 1.5em" id="section-2-3.8">A small, opaque UDP datagram that the server sends in response to a
+punch request (<a href="#punch-packet" class="auto internal xref">Section 6</a>). Its purpose is to create a binding
+in NATs and firewalls on the server side.<a href="#section-2-3.8" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-2-3.9">Attempt:</dt>
+        <dd style="margin-left: 1.5em" id="section-2-3.10">The sequence consisting of one punch request, the resulting punch
+packet, and the client's subsequent path validation for one pair of
+address candidates.<a href="#section-2-3.10" class="pilcrow">¶</a>
+</dd>
+      <dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="overview">
+<section id="section-3">
+      <h2 id="name-overview">
+<a href="#section-3" class="section-number selfRef">3. </a><a href="#name-overview" class="section-name selfRef">Overview</a>
+      </h2>
+<p id="section-3-1">The client and server first establish a QUIC connection over a relayed
+path and negotiate this extension (<a href="#negotiation" class="auto internal xref">Section 9</a>). The server
+advertises its address candidates using ALTERNATIVE_ADDRESS frames.
+The client pairs them with its own candidates and, for each pair it
+wants to try, performs an attempt:<a href="#section-3-1" class="pilcrow">¶</a></p>
+<ol start="1" type="1" class="normal type-1" id="section-3-2">
+<li id="section-3-2.1">
+          <p id="section-3-2.1.1">The client sends a PUNCH_ME_NOW frame on the relayed path, naming
+its own candidate (C) and the server candidate (S).<a href="#section-3-2.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-3-2.2">
+          <p id="section-3-2.2.1">The server sends one punch packet from the sending base associated
+with S to C. The server creates no path and keeps no state for the
+attempt. The punch packet creates a binding in the server-side NAT
+or firewall. It most likely does not reach the client, because the
+client-side NAT has no matching binding yet.<a href="#section-3-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-3-2.3">
+          <p id="section-3-2.3.1">After a delay, the client sends a PATH_CHALLENGE from the base
+associated with C to S. This packet creates a binding in the
+client-side NAT and, because the server-side binding now exists,
+reaches the server.<a href="#section-3-2.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-3-2.4">
+          <p id="section-3-2.4.1">The server answers with PATH_RESPONSE as it would for any
+client-initiated path validation. The response passes through both
+bindings, and the path is validated. The client can then migrate
+the connection to this path, or use it as an additional path when
+QUIC multipath is in use (<a href="#migration" class="auto internal xref">Section 8</a>).<a href="#section-3-2.4.1" class="pilcrow">¶</a></p>
+</li>
+      </ol>
+<span id="name-an-attempt-in-which-both-en"></span><figure id="figure-1">
+        <div class="lang-ascii-art sourcecode" id="section-3-3.1">
+<pre> Client        Client      Relay      Server        Server
+ (base C)        NAT                    NAT        (base S)
+   |              |          |           |             |
+   |-- PUNCH_ME_NOW(C, S) --&gt;|------------------------&gt;|
+   |              |          |           |             |
+   |              x&lt;-------------------- punch packet -|
+   |        (no binding:     |      (binding           |
+   |          dropped)       |       created)          |
+   |              |          |           |             |
+   |  ... client waits ~ smoothed RTT of relayed path ...
+   |              |          |           |             |
+   |-- PATH_CHALLENGE (to S) -------------------------&gt;|
+   |      (binding created)  |       (passes)          |
+   |              |          |           |             |
+   |&lt;------------------------------- PATH_RESPONSE ----|
+   |              |          |           |             |
+
+</pre>
+</div>
+<figcaption><a href="#figure-1" class="selfRef">Figure 1</a>:
+<a href="#name-an-attempt-in-which-both-en" class="selfRef">An attempt in which both endpoints are behind NATs</a>
+        </figcaption></figure>
+<p id="section-3-4">This works when both NATs use endpoint-independent mapping
+(<span><a href="https://rfc-editor.org/rfc/rfc4787#section-4.1" class="relref">Section 4.1</a> of [<a href="#RFC4787" class="cite xref">RFC4787</a>]</span>), regardless of their filtering behavior.
+NATs with endpoint-dependent mapping are discussed in <a href="#open-issues" class="auto internal xref">Appendix C</a>.<a href="#section-3-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="candidates">
+<section id="section-4">
+      <h2 id="name-address-candidates">
+<a href="#section-4" class="section-number selfRef">4. </a><a href="#name-address-candidates" class="section-name selfRef">Address Candidates</a>
+      </h2>
+<p id="section-4-1">The gathering of address candidates is out of scope for this document.
+Endpoints MAY use the logic described in Sections 5.1.1 and 5.2 of
+<span>[<a href="#RFC8445" class="cite xref">RFC8445</a>]</span>, or they MAY use address candidates provided by the
+application.<a href="#section-4-1" class="pilcrow">¶</a></p>
+<p id="section-4-2">The server advertises its candidates using ALTERNATIVE_ADDRESS frames
+<span>[<a href="#I-D.munizaga-quic-alternative-server-address" class="cite xref">I-D.munizaga-quic-alternative-server-address</a>]</span>. The server records
+the sending base associated with each advertised address. A given
+address and port appear at most once in an ALTERNATIVE_ADDRESS frame,
+and in the common case each advertised address corresponds to a single
+sending base. Different sending bases can, however, share an
+advertised address, for example with overlapping address spaces
+(Appendix B.2 of <span>[<a href="#RFC8445" class="cite xref">RFC8445</a>]</span>). How the server chooses a sending base in
+that case is an open issue (<a href="#open-issues" class="auto internal xref">Appendix C</a>).<a href="#section-4-2" class="pilcrow">¶</a></p>
+<p id="section-4-3">The client never advertises its candidates to the server. Instead, it
+names one of its candidates in each punch request. The address the
+client names is the one at which it expects the server's packets to
+arrive, for example a server-reflexive address in the terminology of
+<span>[<a href="#RFC8445" class="cite xref">RFC8445</a>]</span>.<a href="#section-4-3" class="pilcrow">¶</a></p>
+<p id="section-4-4">The client pairs server candidates with its own candidates. Section 5.1
+of <span>[<a href="#RFC8445" class="cite xref">RFC8445</a>]</span> describes one algorithm for forming and prioritizing
+candidate pairs. Since pairing happens only at the client, the
+endpoints do not need to agree on an algorithm.<a href="#section-4-4" class="pilcrow">¶</a></p>
+<p id="section-4-5">When this extension has been negotiated, the client SHOULD NOT send a
+PATH_CHALLENGE to an advertised address for which it has not sent a
+punch request. The guidance in
+<span>[<a href="#I-D.munizaga-quic-alternative-server-address" class="cite xref">I-D.munizaga-quic-alternative-server-address</a>]</span> to validate
+higher-priority addresses promptly still applies, but validation of
+each address is preceded by a punch request.<a href="#section-4-5" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="requests">
+<section id="section-5">
+      <h2 id="name-punch-requests">
+<a href="#section-5" class="section-number selfRef">5. </a><a href="#name-punch-requests" class="section-name selfRef">Punch Requests</a>
+      </h2>
+<p id="section-5-1">To start an attempt, the client sends a PUNCH_ME_NOW frame
+(<a href="#frame" class="auto internal xref">Section 10</a>) on a validated path. The frame contains the client
+candidate and the server candidate of the pair.<a href="#section-5-1" class="pilcrow">¶</a></p>
+<p id="section-5-2">The client SHOULD send punch requests as soon as candidate pairs become
+available. It MAY delay requests in order to prioritize pairs or to
+limit the number of attempts in progress.<a href="#section-5-2" class="pilcrow">¶</a></p>
+<p id="section-5-3">On receiving a PUNCH_ME_NOW frame, the server looks up the server
+address and port among the IPv4 and IPv6 entries it has advertised in
+its most recent ALTERNATIVE_ADDRESS frame.<a href="#section-5-3" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-5-4.1">
+          <p id="section-5-4.1.1">If there is no matching entry, the server MUST ignore the frame. This
+can happen legitimately, because the client's request might have
+been sent before it processed an ALTERNATIVE_ADDRESS frame that
+withdrew the address. The server MUST NOT treat this as a connection
+error.<a href="#section-5-4.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-5-4.2">
+          <p id="section-5-4.2.1">Otherwise, the server sends one punch packet (<a href="#punch-packet" class="auto internal xref">Section 6</a>) from
+the sending base associated with the entry to the client address
+and port in the frame, subject to the limits in <a href="#limits" class="auto internal xref">Section 5.1</a>.<a href="#section-5-4.2.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-5-5">After sending the punch packet, or after ignoring the frame, the server
+retains no state related to the request. In particular, the server does
+not create a path, does not allocate a connection ID, and does not
+report the result of the attempt.<a href="#section-5-5" class="pilcrow">¶</a></p>
+<p id="section-5-6">A server MAY decline to send a punch packet for any reason, for example
+because of the limits in <a href="#limits" class="auto internal xref">Section 5.1</a> or local policy about acceptable
+client addresses. The client learns of this only because its path
+validation fails.<a href="#section-5-6" class="pilcrow">¶</a></p>
+<div id="limits">
+<section id="section-5.1">
+        <h3 id="name-limits">
+<a href="#section-5.1" class="section-number selfRef">5.1. </a><a href="#name-limits" class="section-name selfRef">Limits</a>
+        </h3>
+<p id="section-5.1-1">A punch request causes the server to send a packet to an address chosen
+by the client, before that address has been validated. To prevent the
+extension from being used for amplification, the server MUST NOT send
+more than one punch packet in response to a single received packet,
+regardless of how many PUNCH_ME_NOW frames that packet contains. If a
+packet contains more than one PUNCH_ME_NOW frame, the server processes
+at most one of them and ignores the others as described in
+<a href="#requests" class="auto internal xref">Section 5</a>. Together with the size limit in <a href="#punch-packet" class="auto internal xref">Section 6</a>, this
+ensures that neither the number of packets nor the number of bytes the
+server sends in punch packets exceeds what it received in the
+corresponding requests. Because the limit applies to each received
+packet, a client cannot accumulate an allowance and later release it as
+a burst.<a href="#section-5.1-1" class="pilcrow">¶</a></p>
+<p id="section-5.1-2">A client SHOULD therefore send each PUNCH_ME_NOW frame, including a
+retransmitted one, in a separate packet.<a href="#section-5.1-2" class="pilcrow">¶</a></p>
+<p id="section-5.1-3">The server MUST additionally limit the rate at which it sends punch
+packets on a connection, for example using a token bucket with a small
+burst size. Each punch packet creates a binding in the server-side NAT,
+and an unbounded number of requests could exhaust its mapping table and
+disrupt unrelated flows. Requests that exceed the limit are ignored as
+described in <a href="#requests" class="auto internal xref">Section 5</a>.<a href="#section-5.1-3" class="pilcrow">¶</a></p>
+<p id="section-5.1-4">The server MUST NOT send a punch packet to an address that it would not
+use as the destination of a QUIC packet, such as a multicast,
+broadcast, or unspecified address.<a href="#section-5.1-4" class="pilcrow">¶</a></p>
+<p id="section-5.1-5">Because the client chooses both the destination address and the
+destination port, punch requests can be used for request forgery
+(<span><a href="https://rfc-editor.org/rfc/rfc9000#section-21.5" class="relref">Section 21.5</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>). The server SHOULD NOT send a punch packet
+to a loopback or link-local address, or to an address that is reachable
+only from the server's own network (for example, a private address
+reachable through a sending base that is not behind a NAT), unless
+local policy explicitly permits it. The server MAY also refuse to send
+punch packets to destination ports that it considers sensitive, applying
+the countermeasures in <span><a href="https://rfc-editor.org/rfc/rfc9000#section-21.5.6" class="relref">Section 21.5.6</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>.<a href="#section-5.1-5" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="punch-packet">
+<section id="section-6">
+      <h2 id="name-punch-packets">
+<a href="#section-6" class="section-number selfRef">6. </a><a href="#name-punch-packets" class="section-name selfRef">Punch Packets</a>
+      </h2>
+<p id="section-6-1">A punch packet is a UDP datagram sent by the server from the selected
+sending base to the client address and port given in the punch
+request. Its only purpose is to create a binding in NATs and firewalls
+on the server side. The client is not expected to receive or process
+it.<a href="#section-6-1" class="pilcrow">¶</a></p>
+<p id="section-6-2">A server MUST NOT send more than one punch packet in response to a
+single PUNCH_ME_NOW frame, nor more than one in response to a single
+received packet (<a href="#limits" class="auto internal xref">Section 5.1</a>). Punch packets are never retransmitted. If a
+punch packet is lost, the attempt fails, and the client can start a new
+attempt with a new request (<a href="#validation" class="auto internal xref">Section 7</a>).<a href="#section-6-2" class="pilcrow">¶</a></p>
+<p id="section-6-3">A punch packet SHOULD be formatted as a QUIC packet with a short
+header, so that it is treated as part of a QUIC flow by middleboxes on
+the path. The Destination Connection ID MUST be a random value chosen
+by the server for this packet. It MUST NOT be a connection ID issued by
+the client, so that the punch packet cannot be linked to other paths of
+the connection (<span><a href="https://rfc-editor.org/rfc/rfc9000#section-9.5" class="relref">Section 9.5</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>) and cannot be accepted by the
+client as a packet of the connection. The remainder of the packet is
+opaque. The server MAY construct it as a 1-RTT packet of the connection
+containing a single PING frame, or MAY fill it with random bytes.<a href="#section-6-3" class="pilcrow">¶</a></p>
+<p id="section-6-4">If the server constructs the punch packet as a protected 1-RTT packet,
+the packet MUST be long enough for header protection to be applied
+(<span><a href="https://rfc-editor.org/rfc/rfc9001#section-5.4.2" class="relref">Section 5.4.2</a> of [<a href="#RFC9001" class="cite xref">RFC9001</a>]</span>): at least 4 bytes must follow the start of
+the Packet Number field in addition to the 16-byte sample. With a
+single PING frame and a short packet number encoding, this requires
+adding PADDING frames or using a longer packet number encoding.<a href="#section-6-4" class="pilcrow">¶</a></p>
+<p id="section-6-5">A punch packet SHOULD be as small as the server can make it, and MUST
+NOT be larger than the packet in which the corresponding PUNCH_ME_NOW
+frame was received. It does not need to be expanded to 1200 bytes: the
+path MTU is verified later by the client's PATH_CHALLENGE, which is
+subject to the datagram size requirements of <span><a href="https://rfc-editor.org/rfc/rfc9000#section-8.2.1" class="relref">Section 8.2.1</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>.<a href="#section-6-5" class="pilcrow">¶</a></p>
+<p id="section-6-6">If the server constructs the punch packet using the connection's packet
+protection, it takes the packet number from the application data
+packet number space of the path on which the PUNCH_ME_NOW frame was
+received; with QUIC multipath, this is the packet number space of that
+path's Path ID, which is also used to form the nonce. The packet number
+is consumed: the server MUST NOT use it for any other packet, as reusing
+a packet number with the same key and Path ID would reuse the AEAD
+nonce. The packet number MUST NOT be tracked for loss recovery or
+congestion control. The punch packet is not expected to be
+acknowledged, and declaring it lost would cause a spurious congestion
+response on the relayed path. From the peer's point of view the number
+is skipped, which is permitted (<span><a href="https://rfc-editor.org/rfc/rfc9000#section-21.4" class="relref">Section 21.4</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>).<a href="#section-6-6" class="pilcrow">¶</a></p>
+<div id="receiving-a-punch-packet">
+<section id="section-6.1">
+        <h3 id="name-receiving-a-punch-packet">
+<a href="#section-6.1" class="section-number selfRef">6.1. </a><a href="#name-receiving-a-punch-packet" class="section-name selfRef">Receiving a Punch Packet</a>
+        </h3>
+<p id="section-6.1-1">If a punch packet reaches the client, the client cannot associate it
+with a connection, because its Destination Connection ID was never
+issued. The client handles it as any packet with an unknown connection
+ID (<span><a href="https://rfc-editor.org/rfc/rfc9000#section-5.2" class="relref">Section 5.2</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>): the packet is discarded.<a href="#section-6.1-1" class="pilcrow">¶</a></p>
+<p id="section-6.1-2">A client that uses zero-length connection IDs associates packets with
+connections by local address and port (<span><a href="https://rfc-editor.org/rfc/rfc9000#section-5.2.1" class="relref">Section 5.2.1</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>), and
+might therefore attempt to process a punch packet that arrives on the
+base associated with its candidate. The punch packet cannot be
+authenticated by the client, because the client parses the header
+differently from how the server constructed it, or because the packet
+consists of random bytes. The client discards it as it would any packet
+that fails authentication. Such a failure counts toward the integrity
+limit of the connection's keys (<span><a href="https://rfc-editor.org/rfc/rfc9001#section-6.6" class="relref">Section 6.6</a> of [<a href="#RFC9001" class="cite xref">RFC9001</a>]</span>); this is
+negligible, as the number of punch packets is small.<a href="#section-6.1-2" class="pilcrow">¶</a></p>
+<p id="section-6.1-3">The client might respond with a Stateless Reset
+(<span><a href="https://rfc-editor.org/rfc/rfc9000#section-10.3" class="relref">Section 10.3</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>). This is harmless. Its size is bounded by
+the rules in <span><a href="https://rfc-editor.org/rfc/rfc9000#section-10.3" class="relref">Section 10.3</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>: it is normally smaller than the
+punch packet (<span><a href="https://rfc-editor.org/rfc/rfc9000#section-10.3.3" class="relref">Section 10.3.3</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>) and is never three or more
+times larger. It cannot match a stateless reset token issued for the
+connection, and it is sent toward an address the server has advertised
+and from which the server sent the punch packet. Endpoints SHOULD NOT treat the receipt of a punch packet
+as an error, and implementations are encouraged not to log it at a
+level that suggests a fault.<a href="#section-6.1-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="validation">
+<section id="section-7">
+      <h2 id="name-client-initiated-path-valid">
+<a href="#section-7" class="section-number selfRef">7. </a><a href="#name-client-initiated-path-valid" class="section-name selfRef">Client-Initiated Path Validation</a>
+      </h2>
+<p id="section-7-1">After sending a PUNCH_ME_NOW frame, the client waits before probing the
+path, so that the server's punch packet has time to create the
+server-side binding. If the client's PATH_CHALLENGE reaches the server
+side first, the server-side NAT is likely to drop it.<a href="#section-7-1" class="pilcrow">¶</a></p>
+<p id="section-7-2">The relayed request needs roughly one one-way delay of the relayed
+path to reach the server. It is RECOMMENDED that the client wait for
+the smoothed RTT (<span><a href="https://rfc-editor.org/rfc/rfc9002#section-5.3" class="relref">Section 5.3</a> of [<a href="#RFC9002" class="cite xref">RFC9002</a>]</span>) of the path on which it
+sent the PUNCH_ME_NOW frame. This leaves a margin of approximately one
+further one-way delay. A client MAY use a shorter delay if it has
+better information.<a href="#section-7-2" class="pilcrow">¶</a></p>
+<p id="section-7-3">The client then validates the path from the base associated with the
+client candidate to the server candidate.<a href="#section-7-3" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-7-4.1">
+          <p id="section-7-4.1.1">Without QUIC multipath, the client follows
+<span><a href="https://rfc-editor.org/rfc/rfc9000#section-8.2" class="relref">Section 8.2</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>, using a connection ID issued by the server
+that has not been used on any other path.<a href="#section-7-4.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-7-4.2">
+          <p id="section-7-4.2.1">With QUIC multipath <span>[<a href="#I-D.ietf-quic-multipath" class="cite xref">I-D.ietf-quic-multipath</a>]</span>, the client opens a
+new path using an unused Path ID, as for any other new path.<a href="#section-7-4.2.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-7-5">The server responds as it would to any client-initiated path validation
+or new path; no behavior specific to this extension is required on the
+server for this step.<a href="#section-7-5" class="pilcrow">¶</a></p>
+<p id="section-7-6">The client sends PATH_CHALLENGE frames, and handles validation timeout,
+as described in <span><a href="https://rfc-editor.org/rfc/rfc9000#section-8.2.4" class="relref">Section 8.2.4</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>. A PATH_CHALLENGE that is
+dropped because it arrived before the server-side binding existed is
+handled like a lost packet; a subsequent PATH_CHALLENGE for the same
+validation can still succeed.<a href="#section-7-6" class="pilcrow">¶</a></p>
+<p id="section-7-7">If validation fails, the client abandons the attempt:<a href="#section-7-7" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-7-8.1">
+          <p id="section-7-8.1.1">Without QUIC multipath, the client retires the connection ID it used
+for the attempt with a RETIRE_CONNECTION_ID frame. The server issues
+a replacement using NEW_CONNECTION_ID as usual.<a href="#section-7-8.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-7-8.2">
+          <p id="section-7-8.2.1">With QUIC multipath, the client closes the path with PATH_ABANDON,
+which also retires its connection IDs.<a href="#section-7-8.2.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-7-9">The client MAY then start a new attempt for the same pair by sending a
+new PUNCH_ME_NOW frame. Each attempt consumes a fresh server-issued
+connection ID, as required by <span><a href="https://rfc-editor.org/rfc/rfc9000#section-9.5" class="relref">Section 9.5</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>.<a href="#section-7-9" class="pilcrow">¶</a></p>
+<p id="section-7-10">Without QUIC multipath, failed attempts release their connection IDs,
+so the number of connection IDs needed is bounded by the number of
+attempts in progress at the same time, not by the total number of
+attempts. The client controls this number through its
+active_connection_id_limit transport parameter.<a href="#section-7-10" class="pilcrow">¶</a></p>
+<p id="section-7-11">With QUIC multipath, a Path ID cannot be reused once its path has been
+abandoned, so each attempt consumes a Path ID permanently. The number
+of attempts is therefore bounded by the maximum Path ID advertised by
+the server. A server that has negotiated both this extension and QUIC
+multipath SHOULD increase the maximum Path ID using MAX_PATH_ID frames
+as paths are abandoned, so that failed attempts do not prevent further
+attempts. A client that cannot start an attempt because it has run out
+of Path IDs can signal this with a PATHS_BLOCKED frame.<a href="#section-7-11" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="migration">
+<section id="section-8">
+      <h2 id="name-migration">
+<a href="#section-8" class="section-number selfRef">8. </a><a href="#name-migration" class="section-name selfRef">Migration</a>
+      </h2>
+<p id="section-8-1">Once a direct path has been validated, the client can migrate the
+connection to it (<span><a href="https://rfc-editor.org/rfc/rfc9000#section-9" class="relref">Section 9</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>) or, when QUIC multipath is
+used, send application data on it. How the client chooses among
+validated paths, and whether it keeps the relayed path, is out of scope
+for this document.<a href="#section-8-1" class="pilcrow">¶</a></p>
+<p id="section-8-2">The client's path validation verifies only the server's address. When
+the client migrates by sending non-probing frames on the new path, the
+server validates the client's address as required by
+<span><a href="https://rfc-editor.org/rfc/rfc9000#section-9.3" class="relref">Section 9.3</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>; with QUIC multipath, the server likewise
+validates the new path before using it. This is ordinary server
+behavior, not part of this extension, and takes place only after the
+client has validated the path, so both NAT bindings already exist and
+the validation is expected to succeed. Until it completes, the server
+is limited by the anti-amplification limit
+(<span><a href="https://rfc-editor.org/rfc/rfc9000#section-8" class="relref">Section 8</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>), which can add up to one round trip of the
+direct path before the server can send at full rate.<a href="#section-8-2" class="pilcrow">¶</a></p>
+<p id="section-8-3">Because all new paths are initiated by the client, this extension does
+not require the server to migrate the connection, consistent with
+<span><a href="https://rfc-editor.org/rfc/rfc9000#section-9" class="relref">Section 9</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>.<a href="#section-8-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="negotiation">
+<section id="section-9">
+      <h2 id="name-extension-negotiation">
+<a href="#section-9" class="section-number selfRef">9. </a><a href="#name-extension-negotiation" class="section-name selfRef">Extension Negotiation</a>
+      </h2>
+<p id="section-9-1">Endpoints advertise support for this extension by sending the
+stateless_punch transport parameter (<span><a href="https://rfc-editor.org/rfc/rfc9000#section-7.4" class="relref">Section 7.4</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>) with an
+empty value. An endpoint that understands this transport parameter MUST
+treat receipt of a non-empty value as a connection error of type
+TRANSPORT_PARAMETER_ERROR.<a href="#section-9-1" class="pilcrow">¶</a></p>
+<p id="section-9-2">The extension is in use on a connection only if both endpoints sent the
+transport parameter. A client that sends stateless_punch MUST also send
+the alternative_address transport parameter defined in
+<span>[<a href="#I-D.munizaga-quic-alternative-server-address" class="cite xref">I-D.munizaga-quic-alternative-server-address</a>]</span>. A server that
+understands stateless_punch MUST treat receipt of stateless_punch
+without alternative_address as a connection error of type
+TRANSPORT_PARAMETER_ERROR.<a href="#section-9-2" class="pilcrow">¶</a></p>
+<p id="section-9-3">This transport parameter MUST NOT be remembered for use in 0-RTT. The
+PUNCH_ME_NOW frame MUST only be sent in 1-RTT packets.<a href="#section-9-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="frame">
+<section id="section-10">
+      <h2 id="name-punch_me_now-frame">
+<a href="#section-10" class="section-number selfRef">10. </a><a href="#name-punch_me_now-frame" class="section-name selfRef">PUNCH_ME_NOW Frame</a>
+      </h2>
+<span id="name-punch_me_now-frame-format"></span><figure id="figure-2">
+        <div class="alignLeft art-text artwork" id="section-10-1.1">
+<pre>PUNCH_ME_NOW Frame {
+  Type (i) = 0x5eea90..0x5eea91,
+  Client Address (32/128),
+  Client Port (16),
+  Server Address (32/128),
+  Server Port (16),
+}
+
+</pre>
+</div>
+<figcaption><a href="#figure-2" class="selfRef">Figure 2</a>:
+<a href="#name-punch_me_now-frame-format" class="selfRef">PUNCH_ME_NOW Frame Format</a>
+        </figcaption></figure>
+<p id="section-10-2">The least significant bit of the frame type selects the address
+family: 0x5eea90 indicates IPv4, in which case both address fields are
+32 bits long; 0x5eea91 indicates IPv6, in which case both address
+fields are 128 bits long.<a href="#section-10-2" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlCompact dlParallel" id="section-10-3">
+        <dt id="section-10-3.1">Client Address and Client Port:</dt>
+        <dd style="margin-left: 1.5em" id="section-10-3.2">The client's address candidate to which the server sends the punch
+packet.<a href="#section-10-3.2" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-10-3.3">Server Address and Server Port:</dt>
+        <dd style="margin-left: 1.5em" id="section-10-3.4">The server candidate, which MUST be equal to an IPv4 or IPv6 entry
+that the client received in an ALTERNATIVE_ADDRESS frame.<a href="#section-10-3.4" class="pilcrow">¶</a>
+</dd>
+      <dd class="break"></dd>
+</dl>
+<p id="section-10-4">PUNCH_ME_NOW frames are ack-eliciting and are not probing frames
+(<span><a href="https://rfc-editor.org/rfc/rfc9000#section-9.1" class="relref">Section 9.1</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>); they are sent on a validated path. A lost
+PUNCH_ME_NOW frame SHOULD be retransmitted unless the client has given
+up on the attempt. Because the server keeps no state, each received
+frame, including a retransmission, is processed independently and can
+result in a punch packet, subject to <a href="#limits" class="auto internal xref">Section 5.1</a>.<a href="#section-10-4" class="pilcrow">¶</a></p>
+<p id="section-10-5">This frame is only sent by the client. A client MUST treat receipt of
+a PUNCH_ME_NOW frame as a connection error of type PROTOCOL_VIOLATION.<a href="#section-10-5" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="security-considerations">
+<section id="section-11">
+      <h2 id="name-security-considerations">
+<a href="#section-11" class="section-number selfRef">11. </a><a href="#name-security-considerations" class="section-name selfRef">Security Considerations</a>
+      </h2>
+<p id="section-11-1">This extension allows a client to cause the server to send a packet to
+an address of the client's choosing before that address has been
+validated. This is similar to the request forgery risk discussed in
+<span><a href="https://rfc-editor.org/rfc/rfc9000#section-21.5" class="relref">Section 21.5</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>. The following properties limit the
+exposure:<a href="#section-11-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-11-2.1">
+          <p id="section-11-2.1.1">The server sends at most one punch packet per received packet,
+however many requests that packet contains, and the punch packet is
+no larger than the packet carrying the request (<a href="#limits" class="auto internal xref">Section 5.1</a>). The
+extension therefore provides no amplification, in either packets or
+bytes, and unused allowance cannot be accumulated into a burst.<a href="#section-11-2.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-11-2.2">
+          <p id="section-11-2.2.1">Punch packets are not retransmitted and their contents are not chosen
+by the client. However, the client chooses the destination address
+and port, so a punch packet could reach a service, or create state in
+a firewall, that an off-path attacker could not reach directly. The
+restrictions on destinations in <a href="#limits" class="auto internal xref">Section 5.1</a> address this.<a href="#section-11-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-11-2.3">
+          <p id="section-11-2.3.1">The server does not send PATH_CHALLENGE frames or any other frames of
+the connection on unvalidated paths as part of this extension. All
+traffic on a new path beyond the punch packet is sent in response to
+packets received from the client on that path, and is therefore
+subject to the anti-amplification limits of
+<span><a href="https://rfc-editor.org/rfc/rfc9000#section-8" class="relref">Section 8</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>.<a href="#section-11-2.3.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-11-3">Each punch packet creates a binding in NATs on the server side. A
+client sending many requests could exhaust the mapping table of the
+server's NAT, affecting other flows. Servers rate-limit punch packets
+for this reason (<a href="#limits" class="auto internal xref">Section 5.1</a>).<a href="#section-11-3" class="pilcrow">¶</a></p>
+<p id="section-11-4">A punch packet can elicit a Stateless Reset from the client's endpoint.
+Its size is bounded relative to the punch packet as described in
+<span><a href="https://rfc-editor.org/rfc/rfc9000#section-10.3" class="relref">Section 10.3</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>, and it is sent toward the server's own
+sending base.<a href="#section-11-4" class="pilcrow">¶</a></p>
+<p id="section-11-5">Punch requests are carried inside an authenticated QUIC connection and
+cannot be forged by an off-path attacker.<a href="#section-11-5" class="pilcrow">¶</a></p>
+<p id="section-11-6">The Destination Connection ID of a punch packet is random and is not
+used on any other path, so punch packets cannot be correlated with
+other packets of the connection by an observer
+(<span><a href="https://rfc-editor.org/rfc/rfc9000#section-9.5" class="relref">Section 9.5</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>). A punch packet reveals the server's
+advertised address to the network at the client's candidate address;
+the server has already advertised this address to the client.<a href="#section-11-6" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="iana-considerations">
+<section id="section-12">
+      <h2 id="name-iana-considerations">
+<a href="#section-12" class="section-number selfRef">12. </a><a href="#name-iana-considerations" class="section-name selfRef">IANA Considerations</a>
+      </h2>
+<div id="quic-transport-parameter">
+<section id="section-12.1">
+        <h3 id="name-quic-transport-parameter">
+<a href="#section-12.1" class="section-number selfRef">12.1. </a><a href="#name-quic-transport-parameter" class="section-name selfRef">QUIC Transport Parameter</a>
+        </h3>
+<p id="section-12.1-1">This document registers the following value in the "QUIC Transport
+Parameters" registry maintained at
+<span><a href="https://www.iana.org/assignments/quic">https://www.iana.org/assignments/quic</a></span>.<a href="#section-12.1-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlCompact dlParallel" id="section-12.1-2">
+          <dt id="section-12.1-2.1">Value:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.1-2.2">0x5eea9e7a (provisional, to be assigned)<a href="#section-12.1-2.2" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-12.1-2.3">Parameter Name:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.1-2.4">stateless_punch<a href="#section-12.1-2.4" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-12.1-2.5">Status:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.1-2.6">provisional<a href="#section-12.1-2.6" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-12.1-2.7">Specification:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.1-2.8">This document<a href="#section-12.1-2.8" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="quic-frame-types">
+<section id="section-12.2">
+        <h3 id="name-quic-frame-types">
+<a href="#section-12.2" class="section-number selfRef">12.2. </a><a href="#name-quic-frame-types" class="section-name selfRef">QUIC Frame Types</a>
+        </h3>
+<p id="section-12.2-1">This document registers the following values in the "QUIC Frame Types"
+registry maintained at <span><a href="https://www.iana.org/assignments/quic">https://www.iana.org/assignments/quic</a></span>.<a href="#section-12.2-1" class="pilcrow">¶</a></p>
+<span id="name-frame-type-registrations"></span><table class="center" id="table-1">
+          <caption>
+<a href="#table-1" class="selfRef">Table 1</a>:
+<a href="#name-frame-type-registrations" class="selfRef">Frame type registrations</a>
+          </caption>
+<thead>
+            <tr>
+              <th class="text-left" rowspan="1" colspan="1">Value</th>
+              <th class="text-left" rowspan="1" colspan="1">Frame Name</th>
+              <th class="text-left" rowspan="1" colspan="1">Status</th>
+              <th class="text-left" rowspan="1" colspan="1">Specification</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="text-left" rowspan="1" colspan="1">0x5eea90 - 0x5eea91</td>
+              <td class="text-left" rowspan="1" colspan="1">PUNCH_ME_NOW</td>
+              <td class="text-left" rowspan="1" colspan="1">provisional</td>
+              <td class="text-left" rowspan="1" colspan="1">This document</td>
+            </tr>
+          </tbody>
+        </table>
+</section>
+</div>
+</section>
+</div>
+<section id="section-13">
+      <h2 id="name-references">
+<a href="#section-13" class="section-number selfRef">13. </a><a href="#name-references" class="section-name selfRef">References</a>
+      </h2>
+<section id="section-13.1">
+        <h3 id="name-normative-references">
+<a href="#section-13.1" class="section-number selfRef">13.1. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
+        </h3>
+<dl class="references">
+<dt id="I-D.ietf-quic-multipath">[I-D.ietf-quic-multipath]</dt>
+        <dd>
+<span class="refAuthor">Liu, Y.</span>, <span class="refAuthor">Ma, Y.</span>, <span class="refAuthor">De Coninck, Q.</span>, <span class="refAuthor">Bonaventure, O.</span>, <span class="refAuthor">Huitema, C.</span>, and <span class="refAuthor">M. Kühlewind</span>, <span class="refTitle">"Managing multiple paths for a QUIC connection"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-quic-multipath-21</span>, <time datetime="2026-03-17" class="refDate">17 March 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-quic-multipath-21">https://datatracker.ietf.org/doc/html/draft-ietf-quic-multipath-21</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.munizaga-quic-alternative-server-address">[I-D.munizaga-quic-alternative-server-address]</dt>
+        <dd>
+<span class="refAuthor">Munizaga, M.</span> and <span class="refAuthor">M. Seemann</span>, <span class="refTitle">"QUIC Alternative Server Address Frames"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-munizaga-quic-alternative-server-address-02</span>, <time datetime="2026-09-25" class="refDate">25 September 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-munizaga-quic-alternative-server-address-02">https://datatracker.ietf.org/doc/html/draft-munizaga-quic-alternative-server-address-02</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8445">[RFC8445]</dt>
+        <dd>
+<span class="refAuthor">Keranen, A.</span>, <span class="refAuthor">Holmberg, C.</span>, and <span class="refAuthor">J. Rosenberg</span>, <span class="refTitle">"Interactive Connectivity Establishment (ICE): A Protocol for Network Address Translator (NAT) Traversal"</span>, <span class="seriesInfo">RFC 8445</span>, <span class="seriesInfo">DOI 10.17487/RFC8445</span>, <time datetime="2018-07" class="refDate">July 2018</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc8445">https://www.rfc-editor.org/info/rfc8445</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9000">[RFC9000]</dt>
+        <dd>
+<span class="refAuthor">Iyengar, J., Ed.</span> and <span class="refAuthor">M. Thomson, Ed.</span>, <span class="refTitle">"QUIC: A UDP-Based Multiplexed and Secure Transport"</span>, <span class="seriesInfo">RFC 9000</span>, <span class="seriesInfo">DOI 10.17487/RFC9000</span>, <time datetime="2021-05" class="refDate">May 2021</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9000">https://www.rfc-editor.org/info/rfc9000</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9001">[RFC9001]</dt>
+        <dd>
+<span class="refAuthor">Thomson, M., Ed.</span> and <span class="refAuthor">S. Turner, Ed.</span>, <span class="refTitle">"Using TLS to Secure QUIC"</span>, <span class="seriesInfo">RFC 9001</span>, <span class="seriesInfo">DOI 10.17487/RFC9001</span>, <time datetime="2021-05" class="refDate">May 2021</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9001">https://www.rfc-editor.org/info/rfc9001</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9002">[RFC9002]</dt>
+      <dd>
+<span class="refAuthor">Iyengar, J., Ed.</span> and <span class="refAuthor">I. Swett, Ed.</span>, <span class="refTitle">"QUIC Loss Detection and Congestion Control"</span>, <span class="seriesInfo">RFC 9002</span>, <span class="seriesInfo">DOI 10.17487/RFC9002</span>, <time datetime="2021-05" class="refDate">May 2021</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9002">https://www.rfc-editor.org/info/rfc9002</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+</dl>
+</section>
+<section id="section-13.2">
+        <h3 id="name-informative-references">
+<a href="#section-13.2" class="section-number selfRef">13.2. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
+        </h3>
+<dl class="references">
+<dt id="I-D.ietf-masque-connect-udp-listen">[I-D.ietf-masque-connect-udp-listen]</dt>
+        <dd>
+<span class="refAuthor">Schinazi, D.</span> and <span class="refAuthor">A. Singh</span>, <span class="refTitle">"Proxying Bound UDP in HTTP"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-masque-connect-udp-listen-16</span>, <time datetime="2026-08-24" class="refDate">24 August 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-masque-connect-udp-listen-16">https://datatracker.ietf.org/doc/html/draft-ietf-masque-connect-udp-listen-16</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.seemann-masque-connect-udp-rendezvous">[I-D.seemann-masque-connect-udp-rendezvous]</dt>
+        <dd>
+<span class="refAuthor">Seemann, M.</span>, <span class="refTitle">"UDP Rendezvous over HTTP"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-seemann-masque-connect-udp-rendezvous-00</span>, <time datetime="2026-08-16" class="refDate">16 August 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-seemann-masque-connect-udp-rendezvous-00">https://datatracker.ietf.org/doc/html/draft-seemann-masque-connect-udp-rendezvous-00</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.seemann-quic-nat-traversal">[I-D.seemann-quic-nat-traversal]</dt>
+        <dd>
+<span class="refAuthor">Seemann, M.</span> and <span class="refAuthor">E. Kinnear</span>, <span class="refTitle">"Using QUIC to traverse NATs"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-seemann-quic-nat-traversal-04</span>, <time datetime="2026-11-02" class="refDate">2 November 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-seemann-quic-nat-traversal-04">https://datatracker.ietf.org/doc/html/draft-seemann-quic-nat-traversal-04</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="ISSUE20">[ISSUE20]</dt>
+        <dd>
+<span class="refTitle">"consider allowing probe packets to be smaller than 1200 bytes"</span>, <span class="refContent">draft-seemann-quic-nat-traversal issue #20</span>, <time datetime="2023-10" class="refDate">October 2023</time>, <span>&lt;<a href="https://github.com/marten-seemann/draft-seemann-quic-nat-traversal/issues/20">https://github.com/marten-seemann/draft-seemann-quic-nat-traversal/issues/20</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC4787">[RFC4787]</dt>
+        <dd>
+<span class="refAuthor">Audet, F., Ed.</span> and <span class="refAuthor">C. Jennings</span>, <span class="refTitle">"Network Address Translation (NAT) Behavioral Requirements for Unicast UDP"</span>, <span class="seriesInfo">BCP 127</span>, <span class="seriesInfo">RFC 4787</span>, <span class="seriesInfo">DOI 10.17487/RFC4787</span>, <time datetime="2007-01" class="refDate">January 2007</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc4787">https://www.rfc-editor.org/info/rfc4787</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC7942">[RFC7942]</dt>
+      <dd>
+<span class="refAuthor">Sheffer, Y.</span> and <span class="refAuthor">A. Farrel</span>, <span class="refTitle">"Improving Awareness of Running Code: The Implementation Status Section"</span>, <span class="seriesInfo">BCP 205</span>, <span class="seriesInfo">RFC 7942</span>, <span class="seriesInfo">DOI 10.17487/RFC7942</span>, <time datetime="2016-07" class="refDate">July 2016</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc7942">https://www.rfc-editor.org/info/rfc7942</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+</dl>
+</section>
+</section>
+<div id="comparison">
+<section id="appendix-A">
+      <h2 id="name-comparison-with-draft-seema">
+<a href="#appendix-A" class="section-number selfRef">Appendix A. </a><a href="#name-comparison-with-draft-seema" class="section-name selfRef">Comparison with draft-seemann-quic-nat-traversal-04</a>
+      </h2>
+<p id="appendix-A-1">This appendix explains how the design in this document relates to
+<span>[<a href="#I-D.seemann-quic-nat-traversal" class="cite xref">I-D.seemann-quic-nat-traversal</a>]</span>. Both documents share the overall
+approach (a relayed connection, server candidates advertised with
+ALTERNATIVE_ADDRESS, client-side pairing, migration to a direct path)
+and differ only in how probing is coordinated.<a href="#appendix-A-1" class="pilcrow">¶</a></p>
+<span id="name-comparison-of-the-two-appro"></span><table class="center" id="table-2">
+        <caption>
+<a href="#table-2" class="selfRef">Table 2</a>:
+<a href="#name-comparison-of-the-two-appro" class="selfRef">Comparison of the two approaches</a>
+        </caption>
+<thead>
+          <tr>
+            <th class="text-left" rowspan="1" colspan="1">Aspect</th>
+            <th class="text-left" rowspan="1" colspan="1">seemann-04</th>
+            <th class="text-left" rowspan="1" colspan="1">This document</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Server-initiated validation</td>
+            <td class="text-left" rowspan="1" colspan="1">Yes</td>
+            <td class="text-left" rowspan="1" colspan="1">No</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Server state per attempt</td>
+            <td class="text-left" rowspan="1" colspan="1">Grant, two punching CIDs, status</td>
+            <td class="text-left" rowspan="1" colspan="1">None</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Server packets before validation</td>
+            <td class="text-left" rowspan="1" colspan="1">PATH_CHALLENGE probes, retransmitted until timeout</td>
+            <td class="text-left" rowspan="1" colspan="1">One small punch packet</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">New frames</td>
+            <td class="text-left" rowspan="1" colspan="1">4 (PUNCH_GRANT, MAX_PUNCH_GRANTS, PUNCH_REQUEST, PUNCH_DONE)</td>
+            <td class="text-left" rowspan="1" colspan="1">1 (PUNCH_ME_NOW)</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">New connection ID type</td>
+            <td class="text-left" rowspan="1" colspan="1">Punching connection IDs</td>
+            <td class="text-left" rowspan="1" colspan="1">None</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Multipath special handling</td>
+            <td class="text-left" rowspan="1" colspan="1">Reserved Path ID 0xffffffff</td>
+            <td class="text-left" rowspan="1" colspan="1">None (ordinary path creation)</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Server candidate reference</td>
+            <td class="text-left" rowspan="1" colspan="1">Advertisement sequence number and entry index</td>
+            <td class="text-left" rowspan="1" colspan="1">Address and port</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Added latency</td>
+            <td class="text-left" rowspan="1" colspan="1">None</td>
+            <td class="text-left" rowspan="1" colspan="1">About one relayed smoothed RTT</td>
+          </tr>
+        </tbody>
+      </table>
+<p id="appendix-A-3">Several mechanisms in <span>[<a href="#I-D.seemann-quic-nat-traversal" class="cite xref">I-D.seemann-quic-nat-traversal</a>]</span> follow from
+the server taking part in path validation for each attempt:<a href="#appendix-A-3" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="appendix-A-4.1">
+          <p id="appendix-A-4.1.1">Punching connection IDs are needed because the server sends packets
+of the connection on each candidate path, and the number of
+concurrent attempts would otherwise be limited by
+active_connection_id_limit. In this document, the server sends no
+packet of the connection on an unvalidated path, and the client's
+validation uses ordinary connection IDs whose consumption is bounded
+by the number of concurrent attempts, or, with QUIC multipath, by the
+Path IDs that the server makes available (<a href="#validation" class="auto internal xref">Section 7</a>).<a href="#appendix-A-4.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-4.2">
+          <p id="appendix-A-4.2.1">PUNCH_DONE is needed so that both endpoints can release per-attempt
+state. A stateless server has nothing to release.<a href="#appendix-A-4.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-4.3">
+          <p id="appendix-A-4.3.1">PUNCH_REQUEST is sent both on the established path and inside each
+probe, because a direct probe from the client can overtake the
+relayed request. In this document, the client probes only after a
+delay, so the request always arrives first in normal operation, and
+a PATH_CHALLENGE that arrives too early is simply retransmitted.<a href="#appendix-A-4.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-4.4">
+          <p id="appendix-A-4.4.1">A reserved Path ID is needed for multipath because punching
+connection IDs are not associated with ordinary paths. Here, every
+new path is an ordinary path created by the client.<a href="#appendix-A-4.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-4.5">
+          <p id="appendix-A-4.5.1">Grants and MAX_PUNCH_GRANTS let both endpoints bound the work per
+connection. Here, the server bounds its work with a local rate limit,
+and the existing connection ID and Path ID limits bound the number of
+concurrent attempts.<a href="#appendix-A-4.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-4.6">
+          <p id="appendix-A-4.6.1">Referencing server candidates by advertisement sequence number and
+entry index requires rules for keeping entries stable across
+advertisements and a status for stale references. Naming the address
+directly removes these rules; a request naming a withdrawn address is
+ignored.<a href="#appendix-A-4.6.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="appendix-A-5">The main cost of this document's approach is latency: the client's
+first probe is delayed by about one relayed smoothed RTT. In addition,
+if the single punch packet is lost, a new attempt costs one more
+relayed round trip. The server could mitigate the latter by sending a
+small, fixed number of punch packets without keeping state (see
+<a href="#open-issues" class="auto internal xref">Appendix C</a>).<a href="#appendix-A-5" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="implementation">
+<section id="appendix-B">
+      <h2 id="name-implementation-status">
+<a href="#appendix-B" class="section-number selfRef">Appendix B. </a><a href="#name-implementation-status" class="section-name selfRef">Implementation Status</a>
+      </h2>
+<blockquote id="appendix-B-1">
+        <p id="appendix-B-1.1">Note to RFC Editor: please remove this section before publication.<a href="#appendix-B-1.1" class="pilcrow">¶</a></p>
+</blockquote>
+<p id="appendix-B-2">This section records the status of known implementations of the
+protocol defined by this specification at the time of posting of this
+Internet-Draft, and is based on a proposal described in <span>[<a href="#RFC7942" class="cite xref">RFC7942</a>]</span>.<a href="#appendix-B-2" class="pilcrow">¶</a></p>
+<div id="seera-msquic">
+<section id="appendix-B.1">
+        <h3 id="name-seera-msquic">
+<a href="#appendix-B.1" class="section-number selfRef">B.1. </a><a href="#name-seera-msquic" class="section-name selfRef">SEERA MsQuic</a>
+        </h3>
+<span class="break"></span><dl class="dlCompact dlParallel" id="appendix-B.1-1">
+          <dt id="appendix-B.1-1.1">Organization:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.2">SEERA Networks<a href="#appendix-B.1-1.2" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.3">Description:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.4">A fork of MsQuic that migrates connections carried over a MASQUE
+relay to a direct path. The server processes punch requests without
+keeping per-attempt state and sends a single punch packet, formatted
+as a short-header packet protected with the connection's 1-RTT keys,
+with a random Destination Connection ID and a single PING frame,
+without padding. The client starts path validation after the smoothed
+RTT of the relayed path.<a href="#appendix-B.1-1.4" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.5">Differences from this document:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.6">The implementation predates this document. It identifies the server
+candidate by the sequence number of an ADD_ADDRESS frame as defined
+in draft-seemann-quic-nat-traversal-02, carries an additional Round
+field, and uses the frame types 0x3d7e92 and 0x3d7e93.<a href="#appendix-B.1-1.6" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.7">Maturity:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.8">Used in a relay service operated by SEERA Networks in trial
+deployment.<a href="#appendix-B.1-1.8" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.9">Licensing:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.10">MIT<a href="#appendix-B.1-1.10" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.11">Repository:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.12">
+            <span><a href="https://github.com/seera-networks/msquic">https://github.com/seera-networks/msquic</a></span><a href="#appendix-B.1-1.12" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.13">Contact:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.14">Masahiro Kozuka (kozuka@okayama-u.ac.jp)<a href="#appendix-B.1-1.14" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+</dl>
+</section>
+</div>
+</section>
+</div>
+<div id="open-issues">
+<section id="appendix-C">
+      <h2 id="name-open-issues">
+<a href="#appendix-C" class="section-number selfRef">Appendix C. </a><a href="#name-open-issues" class="section-name selfRef">Open Issues</a>
+      </h2>
+<blockquote id="appendix-C-1">
+        <p id="appendix-C-1.1">Note to RFC Editor: please remove this section before publication.<a href="#appendix-C-1.1" class="pilcrow">¶</a></p>
+</blockquote>
+<span class="break"></span><dl class="dlCompact dlParallel" id="appendix-C-2">
+        <dt id="appendix-C-2.1">Redundant punch packets:</dt>
+        <dd style="margin-left: 1.5em" id="appendix-C-2.2">Should the server be allowed to send a small, fixed number of punch
+packets per request, spaced in time, to tolerate loss without keeping
+state beyond a timer? This trades a bounded increase in traffic for
+fewer re-requests.<a href="#appendix-C-2.2" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+<dt id="appendix-C-2.3">Multiple bases with the same advertised address:</dt>
+        <dd style="margin-left: 1.5em" id="appendix-C-2.4">When candidates with different sending bases share an advertised
+address (for example with overlapping address spaces, see Appendix B.2
+of <span>[<a href="#RFC8445" class="cite xref">RFC8445</a>]</span>), the server cannot tell from the address alone which
+base to use. Should the server send one punch packet from each such
+base, or should requests carry a disambiguator?<a href="#appendix-C-2.4" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+<dt id="appendix-C-2.5">Endpoint-dependent mapping:</dt>
+        <dd style="margin-left: 1.5em" id="appendix-C-2.6">When a NAT uses endpoint-dependent mapping, the external port used
+for the punch packet differs from the advertised one. Port prediction
+techniques could be layered on top of this extension, at the cost of
+more NAT bindings.<a href="#appendix-C-2.6" class="pilcrow">¶</a>
+</dd>
+        <dd class="break"></dd>
+<dt id="appendix-C-2.7">Delay selection:</dt>
+        <dd style="margin-left: 1.5em" id="appendix-C-2.8">Is the smoothed RTT of the relayed path the right default, or should
+the client probe earlier and rely on PATH_CHALLENGE retransmission?<a href="#appendix-C-2.8" class="pilcrow">¶</a>
+</dd>
+      <dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="acknowledgments">
+<section id="appendix-D">
+      <h2 id="name-acknowledgments">
+<a href="#name-acknowledgments" class="section-name selfRef">Acknowledgments</a>
+      </h2>
+<p id="appendix-D-1">This document builds on the work of Marten Seemann and Eric Kinnear in
+<span>[<a href="#I-D.seemann-quic-nat-traversal" class="cite xref">I-D.seemann-quic-nat-traversal</a>]</span>. The stateless approach was suggested
+by Christian Huitema in <span>[<a href="#ISSUE20" class="cite xref">ISSUE20</a>]</span>.<a href="#appendix-D-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="authors-addresses">
+<section id="appendix-E">
+      <h2 id="name-authors-address">
+<a href="#name-authors-address" class="section-name selfRef">Author's Address</a>
+      </h2>
+<address class="vcard">
+        <div dir="auto" class="left"><span class="fn nameRole">Masahiro Kozuka</span></div>
+<div dir="auto" class="left"><span class="org">Okayama University</span></div>
+<div class="email">
+<span>Email:</span>
+<a href="mailto:kozuka@okayama-u.ac.jp" class="email">kozuka@okayama-u.ac.jp</a>
+</div>
+</address>
+</section>
+</div>
+<script>const toc = document.getElementById("toc");
+toc.querySelector("h2").addEventListener("click", e => {
+  toc.classList.toggle("active");
+});
+toc.querySelector("nav").addEventListener("click", e => {
+  toc.classList.remove("active");
+});
+</script>
+</body>
+</html>
