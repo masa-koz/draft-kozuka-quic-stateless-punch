@@ -28,13 +28,13 @@ organization = "Okayama University"
 This document specifies a QUIC extension that lets two endpoints
 connected through a relay establish a direct path between them when one
 or both are behind Network Address Translators (NATs). The client asks
-the server, over the existing connection, to send a single small "punch"
-packet toward one of the client's address candidates. The server keeps
-no per-attempt state and does not initiate validation of candidate
-paths. After a short delay, the client validates the direct path using ordinary
-client-initiated path validation as defined in RFC 9000, or ordinary
-path creation as defined in RFC 10069 when QUIC multipath is in use,
-and can then migrate the connection to it.
+the server, over the existing connection, to send a single small
+"punch" packet toward one of the client's address candidates. The
+server keeps no per-attempt state and does not initiate validation of
+candidate paths. After a short delay, the client validates the direct
+path using ordinary client-initiated path validation as defined in RFC
+9000, or ordinary path creation as defined in RFC 10069 when QUIC
+multipath is in use, and can then migrate the connection to it.
 
 {mainmatter}
 
