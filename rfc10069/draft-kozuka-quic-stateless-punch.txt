@@ -767,7 +767,7 @@ Appendix A.  Comparison with draft-seemann-quic-nat-traversal-04
       packet of the connection on an unvalidated path, and the client's
       validation uses ordinary connection IDs whose consumption is
       bounded by the number of concurrent attempts, or, with QUIC
-      multipath, by the Path IDs that the server makes available
+      multipath, by the Path IDs that both endpoints make available
       (Section 7).
 
    *  PUNCH_DONE is needed so that both endpoints can release per-
