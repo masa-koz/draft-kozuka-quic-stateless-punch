@@ -616,7 +616,7 @@ the server taking part in path validation for each attempt:
   packet of the connection on an unvalidated path, and the client's
   validation uses ordinary connection IDs whose consumption is bounded
   by the number of concurrent attempts, or, with QUIC multipath, by the
-  Path IDs that the server makes available ((#validation)).
+  Path IDs that both endpoints make available ((#validation)).
 
 * PUNCH_DONE is needed so that both endpoints can release per-attempt
   state. A stateless server has nothing to release.
