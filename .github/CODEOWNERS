@@ -1,3 +1,3 @@
 # Automatically generated CODEOWNERS
 # Regenerate with `make update-codeowners`
-draft-kozuka-quic-stateless-punch.md kozuka@okayama-u.ac.jp
+draft-kozuka-quic-stateless-punch.md @masa-koz
