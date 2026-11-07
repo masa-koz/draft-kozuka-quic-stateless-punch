@@ -18,11 +18,12 @@ Abstract
    one or both are behind Network Address Translators (NATs).  The
    client asks the server, over the existing connection, to send a
    single small "punch" packet toward one of the client's address
-   candidates.  The server keeps no per-attempt state and never
-   initiates path validation.  After a short delay, the client validates
-   the direct path using ordinary client-initiated path validation as
-   defined in RFC 9000, or ordinary path creation when QUIC multipath is
-   in use, and can then migrate the connection to it.
+   candidates.  The server keeps no per-attempt state and does not
+   initiate validation of candidate paths.  After a short delay, the
+   client validates the direct path using ordinary client-initiated path
+   validation as defined in RFC 9000, or ordinary path creation as
+   defined in RFC 10069 when QUIC multipath is in use, and can then
+   migrate the connection to it.
 
 Discussion Venues
 
@@ -118,9 +119,11 @@ Table of Contents
    that draft [ISSUE20].  The server's only extension-specific action is
    to send one small, opaque packet per request.  This packet creates
    the binding in the server-side NAT or firewall; it is not expected to
-   be processed by the client.  All path validation is initiated by the
-   client and follows [RFC9000] (or [I-D.ietf-quic-multipath]) without
-   modification.
+   be processed by the client.  Validation of each candidate path is
+   initiated by the client and follows [RFC9000] (or [RFC10069]) without
+   modification.  The only path validation the server performs is the
+   ordinary validation of the client's address when the client migrates
+   to a validated path (Section 8).
 
    The design has the following properties:
 
@@ -372,15 +375,15 @@ Table of Contents
    packet protection, it takes the packet number from the application
    data packet number space of the path on which the PUNCH_ME_NOW frame
    was received; with QUIC multipath, this is the packet number space of
-   that path's Path ID, which is also used to form the nonce.  The
-   packet number is consumed: the server MUST NOT use it for any other
-   packet, as reusing a packet number with the same key and Path ID
-   would reuse the AEAD nonce.  The packet number MUST NOT be tracked
-   for loss recovery or congestion control.  The punch packet is not
-   expected to be acknowledged, and declaring it lost would cause a
-   spurious congestion response on the relayed path.  From the peer's
-   point of view the number is skipped, which is permitted (Section 21.4
-   of [RFC9000]).
+   that path's Path ID, which is also used to form the nonce
+   (Section 2.4 of [RFC10069]).  The packet number is consumed: the
+   server MUST NOT use it for any other packet, as reusing a packet
+   number with the same key and Path ID would reuse the AEAD nonce.  The
+   packet number MUST NOT be tracked for loss recovery or congestion
+   control.  The punch packet is not expected to be acknowledged, and
+   declaring it lost would cause a spurious congestion response on the
+   relayed path.  From the peer's point of view the number is skipped,
+   which is permitted (Section 21.4 of [RFC9000]).
 
 6.1.  Receiving a Punch Packet
 
@@ -432,8 +435,8 @@ Table of Contents
       [RFC9000], using a connection ID issued by the server that has not
       been used on any other path.
 
-   *  With QUIC multipath [I-D.ietf-quic-multipath], the client opens a
-      new path using an unused Path ID, as for any other new path.
+   *  With QUIC multipath [RFC10069], the client opens a new path using
+      an unused Path ID, as for any other new path.
 
    The server responds as it would to any client-initiated path
    validation or new path; no behavior specific to this extension is
@@ -465,14 +468,21 @@ Table of Contents
    active_connection_id_limit transport parameter.
 
    With QUIC multipath, a Path ID cannot be reused once its path has
-   been abandoned, so each attempt consumes a Path ID permanently.  The
-   number of attempts is therefore bounded by the maximum Path ID
-   advertised by the server.  A server that has negotiated both this
-   extension and QUIC multipath SHOULD increase the maximum Path ID
-   using MAX_PATH_ID frames as paths are abandoned, so that failed
+   been abandoned (Section 3.4 of [RFC10069]), because the Path ID is
+   part of the nonce calculation (Section 2.4 of [RFC10069]).  Each
+   attempt therefore consumes a Path ID permanently.  Opening a path
+   requires connection IDs for the same Path ID from both endpoints, so
+   the number of attempts is bounded by the maximum Path ID limits of
+   both endpoints (Section 3.2.1 of [RFC10069]).  When this extension
+   and QUIC multipath are both in use, each endpoint SHOULD increase its
+   maximum Path ID using MAX_PATH_ID frames (Section 4.6 of [RFC10069])
+   as paths are abandoned, and SHOULD issue connection IDs for the newly
+   allowed Path IDs using PATH_NEW_CONNECTION_ID frames, so that failed
    attempts do not prevent further attempts.  A client that cannot start
-   an attempt because it has run out of Path IDs can signal this with a
-   PATHS_BLOCKED frame.
+   an attempt follows Section 3.2.1 of [RFC10069]: it sends a
+   PATHS_BLOCKED frame if it has no unused Path ID, or a
+   PATH_CIDS_BLOCKED frame if it has no connection ID for an unused Path
+   ID (Section 4.7 of [RFC10069]).
 
 8.  Migration
 
@@ -631,20 +641,18 @@ Table of Contents
 
 13.1.  Normative References
 
-   [I-D.ietf-quic-multipath]
-              Liu, Y., Ma, Y., De Coninck, Q., Bonaventure, O., Huitema,
-              C., and M. Kühlewind, "Managing multiple paths for a QUIC
-              connection", Work in Progress, Internet-Draft, draft-ietf-
-              quic-multipath-21, 17 March 2026,
-              <https://datatracker.ietf.org/doc/html/draft-ietf-quic-
-              multipath-21>.
-
    [I-D.munizaga-quic-alternative-server-address]
               Munizaga, M. and M. Seemann, "QUIC Alternative Server
               Address Frames", Work in Progress, Internet-Draft, draft-
               munizaga-quic-alternative-server-address-02, 25 September
               2026, <https://datatracker.ietf.org/doc/html/draft-
               munizaga-quic-alternative-server-address-02>.
+
+   [RFC10069] Liu, Y., Ed., Ma, Y., De Coninck, Q., Ed., Bonaventure,
+              O., Huitema, C., and M. Kühlewind, Ed., "Managing Multiple
+              Paths for a QUIC Connection", RFC 10069,
+              DOI 10.17487/RFC10069, November 2026,
+              <https://www.rfc-editor.org/info/rfc10069>.
 
    [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
               Requirement Levels", BCP 14, RFC 2119,
@@ -720,35 +728,37 @@ Appendix A.  Comparison with draft-seemann-quic-nat-traversal-04
    ALTERNATIVE_ADDRESS, client-side pairing, migration to a direct path)
    and differ only in how probing is coordinated.
 
-   +===================+=============================+================+
-   | Aspect            | seemann-04                  | This document  |
-   +===================+=============================+================+
-   | Server-initiated  | Yes                         | No             |
-   | validation        |                             |                |
-   +-------------------+-----------------------------+----------------+
-   | Server state per  | Grant, two punching CIDs,   | None           |
-   | attempt           | status                      |                |
-   +-------------------+-----------------------------+----------------+
-   | Server packets    | PATH_CHALLENGE probes,      | One small      |
-   | before validation | retransmitted until timeout | punch packet   |
-   +-------------------+-----------------------------+----------------+
-   | New frames        | 4 (PUNCH_GRANT,             | 1              |
-   |                   | MAX_PUNCH_GRANTS,           | (PUNCH_ME_NOW) |
-   |                   | PUNCH_REQUEST, PUNCH_DONE)  |                |
-   +-------------------+-----------------------------+----------------+
-   | New connection ID | Punching connection IDs     | None           |
-   | type              |                             |                |
-   +-------------------+-----------------------------+----------------+
-   | Multipath special | Reserved Path ID 0xffffffff | None (ordinary |
-   | handling          |                             | path creation) |
-   +-------------------+-----------------------------+----------------+
-   | Server candidate  | Advertisement sequence      | Address and    |
-   | reference         | number and entry index      | port           |
-   +-------------------+-----------------------------+----------------+
-   | Added latency     | None                        | About one      |
-   |                   |                             | relayed        |
-   |                   |                             | smoothed RTT   |
-   +-------------------+-----------------------------+----------------+
+    +==================+============================+================+
+    | Aspect           | seemann-04                 | This document  |
+    +==================+============================+================+
+    | Server-initiated | Yes                        | No             |
+    | validation of    |                            |                |
+    | candidate paths  |                            |                |
+    +------------------+----------------------------+----------------+
+    | Server state per | Grant, two punching CIDs,  | None           |
+    | attempt          | status                     |                |
+    +------------------+----------------------------+----------------+
+    | Server packets   | PATH_CHALLENGE probes,     | One small      |
+    | before           | retransmitted until        | punch packet   |
+    | validation       | timeout                    |                |
+    +------------------+----------------------------+----------------+
+    | New frames       | 4 (PUNCH_GRANT,            | 1              |
+    |                  | MAX_PUNCH_GRANTS,          | (PUNCH_ME_NOW) |
+    |                  | PUNCH_REQUEST, PUNCH_DONE) |                |
+    +------------------+----------------------------+----------------+
+    | New connection   | Punching connection IDs    | None           |
+    | ID type          |                            |                |
+    +------------------+----------------------------+----------------+
+    | Multipath        | Reserved Path ID           | None (ordinary |
+    | special handling | 0xffffffff                 | path creation) |
+    +------------------+----------------------------+----------------+
+    | Server candidate | Advertisement sequence     | Address and    |
+    | reference        | number and entry index     | port           |
+    +------------------+----------------------------+----------------+
+    | Added latency    | None                       | About one      |
+    |                  |                            | relayed        |
+    |                  |                            | smoothed RTT   |
+    +------------------+----------------------------+----------------+
 
                 Table 2: Comparison of the two approaches
 
@@ -762,7 +772,7 @@ Appendix A.  Comparison with draft-seemann-quic-nat-traversal-04
       packet of the connection on an unvalidated path, and the client's
       validation uses ordinary connection IDs whose consumption is
       bounded by the number of concurrent attempts, or, with QUIC
-      multipath, by the Path IDs that the server makes available
+      multipath, by the Path IDs that both endpoints make available
       (Section 7).
 
    *  PUNCH_DONE is needed so that both endpoints can release per-

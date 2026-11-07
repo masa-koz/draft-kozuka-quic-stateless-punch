@@ -10,13 +10,13 @@
        This document specifies a QUIC extension that lets two endpoints
 connected through a relay establish a direct path between them when one
 or both are behind Network Address Translators (NATs). The client asks
-the server, over the existing connection, to send a single small &quot;punch&quot;
-packet toward one of the client's address candidates. The server keeps
-no per-attempt state and never initiates path validation. After a short
-delay, the client validates the direct path using ordinary
-client-initiated path validation as defined in RFC 9000, or ordinary
-path creation when QUIC multipath is in use, and can then migrate the
-connection to it. 
+the server, over the existing connection, to send a single small
+&quot;punch&quot; packet toward one of the client's address candidates. The
+server keeps no per-attempt state and does not initiate validation of
+candidate paths. After a short delay, the client validates the direct
+path using ordinary client-initiated path validation as defined in RFC
+9000, or ordinary path creation as defined in RFC 10069 when QUIC
+multipath is in use, and can then migrate the connection to it. 
     " name="description">
 <meta content="xml2rfc 3.35.0" name="generator">
 <meta content="QUIC" name="keyword">
@@ -1091,13 +1091,13 @@ svg {
 <p id="section-abstract-1">This document specifies a QUIC extension that lets two endpoints
 connected through a relay establish a direct path between them when one
 or both are behind Network Address Translators (NATs). The client asks
-the server, over the existing connection, to send a single small "punch"
-packet toward one of the client's address candidates. The server keeps
-no per-attempt state and never initiates path validation. After a short
-delay, the client validates the direct path using ordinary
-client-initiated path validation as defined in RFC 9000, or ordinary
-path creation when QUIC multipath is in use, and can then migrate the
-connection to it.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+the server, over the existing connection, to send a single small
+"punch" packet toward one of the client's address candidates. The
+server keeps no per-attempt state and does not initiate validation of
+candidate paths. After a short delay, the client validates the direct
+path using ordinary client-initiated path validation as defined in RFC
+9000, or ordinary path creation as defined in RFC 10069 when QUIC
+multipath is in use, and can then migrate the connection to it.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 </section>
 <section class="note rfcEditorRemove" id="section-note.1">
       <h2 id="name-discussion-venues">
@@ -1273,9 +1273,11 @@ based on a design suggested by Christian Huitema in the discussion of
 that draft <span>[<a href="#ISSUE20" class="cite xref">ISSUE20</a>]</span>. The server's only extension-specific action is
 to send one small, opaque packet per request. This packet creates the
 binding in the server-side NAT or firewall; it is not expected to be
-processed by the client. All path validation is initiated by the client
-and follows <span>[<a href="#RFC9000" class="cite xref">RFC9000</a>]</span> (or <span>[<a href="#I-D.ietf-quic-multipath" class="cite xref">I-D.ietf-quic-multipath</a>]</span>) without
-modification.<a href="#section-1-3" class="pilcrow">¶</a></p>
+processed by the client. Validation of each candidate path is initiated
+by the client and follows <span>[<a href="#RFC9000" class="cite xref">RFC9000</a>]</span> (or <span>[<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>) without
+modification. The only path validation the server performs is the
+ordinary validation of the client's address when the client migrates
+to a validated path (<a href="#migration" class="auto internal xref">Section 8</a>).<a href="#section-1-3" class="pilcrow">¶</a></p>
 <p id="section-1-4">The design has the following properties:<a href="#section-1-4" class="pilcrow">¶</a></p>
 <ul class="compact">
 <li class="compact" id="section-1-5.1">The server keeps no per-attempt state.<a href="#section-1-5.1" class="pilcrow">¶</a>
@@ -1560,7 +1562,8 @@ subject to the datagram size requirements of <span><a href="https://rfc-editor.o
 protection, it takes the packet number from the application data
 packet number space of the path on which the PUNCH_ME_NOW frame was
 received; with QUIC multipath, this is the packet number space of that
-path's Path ID, which is also used to form the nonce. The packet number
+path's Path ID, which is also used to form the nonce
+(<span><a href="https://rfc-editor.org/rfc/rfc10069#section-2.4" class="relref">Section 2.4</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>). The packet number
 is consumed: the server MUST NOT use it for any other packet, as reusing
 a packet number with the same key and Path ID would reuse the AEAD
 nonce. The packet number MUST NOT be tracked for loss recovery or
@@ -1624,8 +1627,8 @@ client candidate to the server candidate.<a href="#section-7-3" class="pilcrow">
 that has not been used on any other path.<a href="#section-7-4.1.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-7-4.2">
-          <p id="section-7-4.2.1">With QUIC multipath <span>[<a href="#I-D.ietf-quic-multipath" class="cite xref">I-D.ietf-quic-multipath</a>]</span>, the client opens a
-new path using an unused Path ID, as for any other new path.<a href="#section-7-4.2.1" class="pilcrow">¶</a></p>
+          <p id="section-7-4.2.1">With QUIC multipath <span>[<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>, the client opens a new path using
+an unused Path ID, as for any other new path.<a href="#section-7-4.2.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
 <p id="section-7-5">The server responds as it would to any client-initiated path validation
@@ -1657,13 +1660,20 @@ attempts in progress at the same time, not by the total number of
 attempts. The client controls this number through its
 active_connection_id_limit transport parameter.<a href="#section-7-10" class="pilcrow">¶</a></p>
 <p id="section-7-11">With QUIC multipath, a Path ID cannot be reused once its path has been
-abandoned, so each attempt consumes a Path ID permanently. The number
-of attempts is therefore bounded by the maximum Path ID advertised by
-the server. A server that has negotiated both this extension and QUIC
-multipath SHOULD increase the maximum Path ID using MAX_PATH_ID frames
-as paths are abandoned, so that failed attempts do not prevent further
-attempts. A client that cannot start an attempt because it has run out
-of Path IDs can signal this with a PATHS_BLOCKED frame.<a href="#section-7-11" class="pilcrow">¶</a></p>
+abandoned (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-3.4" class="relref">Section 3.4</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>), because the Path ID is part of
+the nonce calculation (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-2.4" class="relref">Section 2.4</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>). Each attempt
+therefore consumes a Path ID permanently. Opening a path requires
+connection IDs for the same Path ID from both endpoints, so the number
+of attempts is bounded by the maximum Path ID limits of both endpoints
+(<span><a href="https://rfc-editor.org/rfc/rfc10069#section-3.2.1" class="relref">Section 3.2.1</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>). When this extension and QUIC multipath
+are both in use, each endpoint SHOULD increase its maximum Path ID
+using MAX_PATH_ID frames (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-4.6" class="relref">Section 4.6</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>) as paths are
+abandoned, and SHOULD issue connection IDs for the newly allowed Path
+IDs using PATH_NEW_CONNECTION_ID frames, so that failed attempts do not
+prevent further attempts. A client that cannot start an attempt follows
+<span><a href="https://rfc-editor.org/rfc/rfc10069#section-3.2.1" class="relref">Section 3.2.1</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>: it sends a PATHS_BLOCKED frame if it has
+no unused Path ID, or a PATH_CIDS_BLOCKED frame if it has no connection
+ID for an unused Path ID (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-4.7" class="relref">Section 4.7</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>).<a href="#section-7-11" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="migration">
@@ -1886,13 +1896,13 @@ registry maintained at <span><a href="https://www.iana.org/assignments/quic">htt
 <a href="#section-13.1" class="section-number selfRef">13.1. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
         </h3>
 <dl class="references">
-<dt id="I-D.ietf-quic-multipath">[I-D.ietf-quic-multipath]</dt>
-        <dd>
-<span class="refAuthor">Liu, Y.</span>, <span class="refAuthor">Ma, Y.</span>, <span class="refAuthor">De Coninck, Q.</span>, <span class="refAuthor">Bonaventure, O.</span>, <span class="refAuthor">Huitema, C.</span>, and <span class="refAuthor">M. Kühlewind</span>, <span class="refTitle">"Managing multiple paths for a QUIC connection"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-quic-multipath-21</span>, <time datetime="2026-03-17" class="refDate">17 March 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-quic-multipath-21">https://datatracker.ietf.org/doc/html/draft-ietf-quic-multipath-21</a>&gt;</span>. </dd>
-<dd class="break"></dd>
 <dt id="I-D.munizaga-quic-alternative-server-address">[I-D.munizaga-quic-alternative-server-address]</dt>
         <dd>
 <span class="refAuthor">Munizaga, M.</span> and <span class="refAuthor">M. Seemann</span>, <span class="refTitle">"QUIC Alternative Server Address Frames"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-munizaga-quic-alternative-server-address-02</span>, <time datetime="2026-09-25" class="refDate">25 September 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-munizaga-quic-alternative-server-address-02">https://datatracker.ietf.org/doc/html/draft-munizaga-quic-alternative-server-address-02</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC10069">[RFC10069]</dt>
+        <dd>
+<span class="refAuthor">Liu, Y., Ed.</span>, <span class="refAuthor">Ma, Y.</span>, <span class="refAuthor">De Coninck, Q., Ed.</span>, <span class="refAuthor">Bonaventure, O.</span>, <span class="refAuthor">Huitema, C.</span>, and <span class="refAuthor">M. Kühlewind, Ed.</span>, <span class="refTitle">"Managing Multiple Paths for a QUIC Connection"</span>, <span class="seriesInfo">RFC 10069</span>, <span class="seriesInfo">DOI 10.17487/RFC10069</span>, <time datetime="2026-11" class="refDate">November 2026</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc10069">https://www.rfc-editor.org/info/rfc10069</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC2119">[RFC2119]</dt>
         <dd>
@@ -1976,7 +1986,7 @@ and differ only in how probing is coordinated.<a href="#appendix-A-1" class="pil
         </thead>
         <tbody>
           <tr>
-            <td class="text-left" rowspan="1" colspan="1">Server-initiated validation</td>
+            <td class="text-left" rowspan="1" colspan="1">Server-initiated validation of candidate paths</td>
             <td class="text-left" rowspan="1" colspan="1">Yes</td>
             <td class="text-left" rowspan="1" colspan="1">No</td>
           </tr>
@@ -2028,7 +2038,7 @@ active_connection_id_limit. In this document, the server sends no
 packet of the connection on an unvalidated path, and the client's
 validation uses ordinary connection IDs whose consumption is bounded
 by the number of concurrent attempts, or, with QUIC multipath, by the
-Path IDs that the server makes available (<a href="#validation" class="auto internal xref">Section 7</a>).<a href="#appendix-A-4.1.1" class="pilcrow">¶</a></p>
+Path IDs that both endpoints make available (<a href="#validation" class="auto internal xref">Section 7</a>).<a href="#appendix-A-4.1.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="appendix-A-4.2">
           <p id="appendix-A-4.2.1">PUNCH_DONE is needed so that both endpoints can release per-attempt
