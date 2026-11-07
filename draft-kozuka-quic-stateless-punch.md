@@ -28,13 +28,13 @@ organization = "Okayama University"
 This document specifies a QUIC extension that lets two endpoints
 connected through a relay establish a direct path between them when one
 or both are behind Network Address Translators (NATs). The client asks
-the server, over the existing connection, to send a single small "punch"
-packet toward one of the client's address candidates. The server keeps
-no per-attempt state and never initiates path validation. After a short
-delay, the client validates the direct path using ordinary
-client-initiated path validation as defined in RFC 9000, or ordinary
-path creation when QUIC multipath is in use, and can then migrate the
-connection to it.
+the server, over the existing connection, to send a single small
+"punch" packet toward one of the client's address candidates. The
+server keeps no per-attempt state and does not initiate validation of
+candidate paths. After a short delay, the client validates the direct
+path using ordinary client-initiated path validation as defined in RFC
+9000, or ordinary path creation as defined in RFC 10069 when QUIC
+multipath is in use, and can then migrate the connection to it.
 
 {mainmatter}
 
@@ -63,9 +63,11 @@ based on a design suggested by Christian Huitema in the discussion of
 that draft [@?ISSUE20]. The server's only extension-specific action is
 to send one small, opaque packet per request. This packet creates the
 binding in the server-side NAT or firewall; it is not expected to be
-processed by the client. All path validation is initiated by the client
-and follows [@!RFC9000] (or [@!I-D.ietf-quic-multipath]) without
-modification.
+processed by the client. Validation of each candidate path is initiated
+by the client and follows [@!RFC9000] (or [@!RFC10069]) without
+modification. The only path validation the server performs is the
+ordinary validation of the client's address when the client migrates
+to a validated path ((#migration)).
 
 The design has the following properties:
 
@@ -322,7 +324,8 @@ If the server constructs the punch packet using the connection's packet
 protection, it takes the packet number from the application data
 packet number space of the path on which the PUNCH_ME_NOW frame was
 received; with QUIC multipath, this is the packet number space of that
-path's Path ID, which is also used to form the nonce. The packet number
+path's Path ID, which is also used to form the nonce
+([@!RFC10069, section 2.4]). The packet number
 is consumed: the server MUST NOT use it for any other packet, as reusing
 a packet number with the same key and Path ID would reuse the AEAD
 nonce. The packet number MUST NOT be tracked for loss recovery or
@@ -380,8 +383,8 @@ client candidate to the server candidate.
   [@!RFC9000, section 8.2], using a connection ID issued by the server
   that has not been used on any other path.
 
-* With QUIC multipath [@!I-D.ietf-quic-multipath], the client opens a
-  new path using an unused Path ID, as for any other new path.
+* With QUIC multipath [@!RFC10069], the client opens a new path using
+  an unused Path ID, as for any other new path.
 
 The server responds as it would to any client-initiated path validation
 or new path; no behavior specific to this extension is required on the
@@ -413,13 +416,20 @@ attempts. The client controls this number through its
 active_connection_id_limit transport parameter.
 
 With QUIC multipath, a Path ID cannot be reused once its path has been
-abandoned, so each attempt consumes a Path ID permanently. The number
-of attempts is therefore bounded by the maximum Path ID advertised by
-the server. A server that has negotiated both this extension and QUIC
-multipath SHOULD increase the maximum Path ID using MAX_PATH_ID frames
-as paths are abandoned, so that failed attempts do not prevent further
-attempts. A client that cannot start an attempt because it has run out
-of Path IDs can signal this with a PATHS_BLOCKED frame.
+abandoned ([@!RFC10069, section 3.4]), because the Path ID is part of
+the nonce calculation ([@!RFC10069, section 2.4]). Each attempt
+therefore consumes a Path ID permanently. Opening a path requires
+connection IDs for the same Path ID from both endpoints, so the number
+of attempts is bounded by the maximum Path ID limits of both endpoints
+([@!RFC10069, section 3.2.1]). When this extension and QUIC multipath
+are both in use, each endpoint SHOULD increase its maximum Path ID
+using MAX_PATH_ID frames ([@!RFC10069, section 4.6]) as paths are
+abandoned, and SHOULD issue connection IDs for the newly allowed Path
+IDs using PATH_NEW_CONNECTION_ID frames, so that failed attempts do not
+prevent further attempts. A client that cannot start an attempt follows
+[@!RFC10069, section 3.2.1]: it sends a PATHS_BLOCKED frame if it has
+no unused Path ID, or a PATH_CIDS_BLOCKED frame if it has no connection
+ID for an unused Path ID ([@!RFC10069, section 4.7]).
 
 # Migration {#migration}
 
@@ -589,7 +599,7 @@ and differ only in how probing is coordinated.
 
 | Aspect                         | seemann-04                                   | This document                         |
 |:-------------------------------|:---------------------------------------------|:--------------------------------------|
-| Server-initiated validation    | Yes                                          | No                                    |
+| Server-initiated validation of candidate paths | Yes                                          | No                                    |
 | Server state per attempt       | Grant, two punching CIDs, status             | None                                  |
 | Server packets before validation | PATH_CHALLENGE probes, retransmitted until timeout | One small punch packet         |
 | New frames                     | 4 (PUNCH_GRANT, MAX_PUNCH_GRANTS, PUNCH_REQUEST, PUNCH_DONE) | 1 (PUNCH_ME_NOW) |
@@ -609,7 +619,7 @@ the server taking part in path validation for each attempt:
   packet of the connection on an unvalidated path, and the client's
   validation uses ordinary connection IDs whose consumption is bounded
   by the number of concurrent attempts, or, with QUIC multipath, by the
-  Path IDs that the server makes available ((#validation)).
+  Path IDs that both endpoints make available ((#validation)).
 
 * PUNCH_DONE is needed so that both endpoints can release per-attempt
   state. A stateless server has nothing to release.
@@ -772,6 +782,21 @@ by Christian Huitema in [@?ISSUE20].
   <seriesInfo name="DOI" value="10.17487/RFC9002"/>
 </reference>
 
+<reference anchor="RFC10069" target="https://www.rfc-editor.org/info/rfc10069">
+  <front>
+    <title>Managing Multiple Paths for a QUIC Connection</title>
+    <author initials="Y." surname="Liu" fullname="Y. Liu" role="editor"/>
+    <author initials="Y." surname="Ma" fullname="Y. Ma"/>
+    <author initials="Q." surname="De Coninck" fullname="Q. De Coninck" role="editor"/>
+    <author initials="O." surname="Bonaventure" fullname="O. Bonaventure"/>
+    <author initials="C." surname="Huitema" fullname="C. Huitema"/>
+    <author initials="M." surname="Kühlewind" fullname="M. Kühlewind" role="editor"/>
+    <date year="2026" month="November"/>
+  </front>
+  <seriesInfo name="RFC" value="10069"/>
+  <seriesInfo name="DOI" value="10.17487/RFC10069"/>
+</reference>
+
 <reference anchor="RFC8445" target="https://www.rfc-editor.org/info/rfc8445">
   <front>
     <title>Interactive Connectivity Establishment (ICE): A Protocol for Network Address Translator (NAT) Traversal</title>
@@ -816,20 +841,6 @@ by Christian Huitema in [@?ISSUE20].
     <date year="2026" month="August" day="24"/>
   </front>
   <seriesInfo name="Internet-Draft" value="draft-ietf-masque-connect-udp-listen-16"/>
-</reference>
-
-<reference anchor="I-D.ietf-quic-multipath" target="https://datatracker.ietf.org/doc/html/draft-ietf-quic-multipath-21">
-  <front>
-    <title>Managing multiple paths for a QUIC connection</title>
-    <author initials="Y." surname="Liu" fullname="Y. Liu"/>
-    <author initials="Y." surname="Ma" fullname="Y. Ma"/>
-    <author initials="Q." surname="De Coninck" fullname="Q. De Coninck"/>
-    <author initials="O." surname="Bonaventure" fullname="O. Bonaventure"/>
-    <author initials="C." surname="Huitema" fullname="C. Huitema"/>
-    <author initials="M." surname="Kühlewind" fullname="M. Kühlewind"/>
-    <date year="2026" month="March" day="17"/>
-  </front>
-  <seriesInfo name="Internet-Draft" value="draft-ietf-quic-multipath-21"/>
 </reference>
 
 <reference anchor="I-D.munizaga-quic-alternative-server-address" target="https://datatracker.ietf.org/doc/html/draft-munizaga-quic-alternative-server-address-02">
