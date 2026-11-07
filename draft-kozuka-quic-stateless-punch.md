@@ -70,9 +70,9 @@ modification.
 The design has the following properties:
 
 * The server keeps no per-attempt state.
-* The server never sends PATH_CHALLENGE frames on unvalidated paths,
-  and the bytes it sends in response to requests do not exceed the
-  bytes it received.
+* The server never sends PATH_CHALLENGE frames on a path before the
+  client has validated that path, and each punch packet is no larger
+  than the packet carrying the request that caused it.
 * No new type of connection ID is introduced, and no special handling
   is needed when QUIC multipath is used.
 * Only one new frame is defined.
@@ -142,7 +142,7 @@ wants to try, performs an attempt:
    client-initiated path validation. The response passes through both
    bindings, and the path is validated. The client can then migrate
    the connection to this path, or use it as an additional path when
-   QUIC multipath is in use.
+   QUIC multipath is in use ((#migration)).
 
 ~~~ ascii-art
  Client        Client      Relay      Server        Server
@@ -177,9 +177,13 @@ application.
 
 The server advertises its candidates using ALTERNATIVE_ADDRESS frames
 [@!I-D.munizaga-quic-alternative-server-address]. The server records
-the sending base associated with each advertised address. Because a
-given address and port appear at most once in an ALTERNATIVE_ADDRESS
-frame, each advertised address maps to exactly one sending base.
+the sending base associated with each advertised address. A given
+address and port appear at most once in an ALTERNATIVE_ADDRESS frame,
+and in the common case each advertised address corresponds to a single
+sending base. Different sending bases can, however, share an
+advertised address, for example with overlapping address spaces
+(Appendix B.2 of [@!RFC8445]). How the server chooses a sending base in
+that case is an open issue ((#open-issues)).
 
 The client never advertises its candidates to the server. Instead, it
 names one of its candidates in each punch request. The address the
@@ -238,21 +242,40 @@ validation fails.
 A punch request causes the server to send a packet to an address chosen
 by the client, before that address has been validated. To prevent the
 extension from being used for amplification, the server MUST NOT send
-more bytes in punch packets than it has received in packets carrying
-PUNCH_ME_NOW frames on the same connection. Since a punch packet is
-normally smaller than the packet carrying the corresponding request
-((#punch-packet)), this limit is not reached in normal operation.
+more than one punch packet in response to a single received packet,
+regardless of how many PUNCH_ME_NOW frames that packet contains. If a
+packet contains more than one PUNCH_ME_NOW frame, the server processes
+at most one of them and ignores the others as described in
+(#requests). Together with the size limit in (#punch-packet), this
+ensures that neither the number of packets nor the number of bytes the
+server sends in punch packets exceeds what it received in the
+corresponding requests. Because the limit applies to each received
+packet, a client cannot accumulate an allowance and later release it as
+a burst.
 
-The server SHOULD additionally limit the rate at which it sends punch
-packets on a connection, for example using a token bucket. Each punch
-packet creates a binding in the server-side NAT, and an unbounded
-number of requests could exhaust its mapping table and disrupt
-unrelated flows. Requests that exceed the limit are ignored as
+A client SHOULD therefore send each PUNCH_ME_NOW frame, including a
+retransmitted one, in a separate packet.
+
+The server MUST additionally limit the rate at which it sends punch
+packets on a connection, for example using a token bucket with a small
+burst size. Each punch packet creates a binding in the server-side NAT,
+and an unbounded number of requests could exhaust its mapping table and
+disrupt unrelated flows. Requests that exceed the limit are ignored as
 described in (#requests).
 
 The server MUST NOT send a punch packet to an address that it would not
 use as the destination of a QUIC packet, such as a multicast,
 broadcast, or unspecified address.
+
+Because the client chooses both the destination address and the
+destination port, punch requests can be used for request forgery
+([@!RFC9000, section 21.5]). The server SHOULD NOT send a punch packet
+to a loopback or link-local address, or to an address that is reachable
+only from the server's own network (for example, a private address
+reachable through a sending base that is not behind a NAT), unless
+local policy explicitly permits it. The server MAY also refuse to send
+punch packets to destination ports that it considers sensitive, applying
+the countermeasures in [@!RFC9000, section 21.5.6].
 
 # Punch Packets {#punch-packet}
 
@@ -263,7 +286,8 @@ on the server side. The client is not expected to receive or process
 it.
 
 A server MUST NOT send more than one punch packet in response to a
-single PUNCH_ME_NOW frame. Punch packets are never retransmitted. If a
+single PUNCH_ME_NOW frame, nor more than one in response to a single
+received packet ((#limits)). Punch packets are never retransmitted. If a
 punch packet is lost, the attempt fails, and the client can start a new
 attempt with a new request ((#validation)).
 
@@ -277,6 +301,13 @@ client as a packet of the connection. The remainder of the packet is
 opaque. The server MAY construct it as a 1-RTT packet of the connection
 containing a single PING frame, or MAY fill it with random bytes.
 
+If the server constructs the punch packet as a protected 1-RTT packet,
+the packet MUST be long enough for header protection to be applied
+([@!RFC9001, section 5.4.2]): at least 4 bytes must follow the start of
+the Packet Number field in addition to the 16-byte sample. With a
+single PING frame and a short packet number encoding, this requires
+adding PADDING frames or using a longer packet number encoding.
+
 A punch packet SHOULD be as small as the server can make it, and MUST
 NOT be larger than the packet in which the corresponding PUNCH_ME_NOW
 frame was received. It does not need to be expanded to 1200 bytes: the
@@ -284,11 +315,17 @@ path MTU is verified later by the client's PATH_CHALLENGE, which is
 subject to the datagram size requirements of [@!RFC9000, section 8.2.1].
 
 If the server constructs the punch packet using the connection's packet
-protection, the packet number it uses MUST NOT be tracked for loss
-recovery or congestion control. The punch packet is not expected to be
+protection, it takes the packet number from the application data
+packet number space of the path on which the PUNCH_ME_NOW frame was
+received; with QUIC multipath, this is the packet number space of that
+path's Path ID, which is also used to form the nonce. The packet number
+is consumed: the server MUST NOT use it for any other packet, as reusing
+a packet number with the same key and Path ID would reuse the AEAD
+nonce. The packet number MUST NOT be tracked for loss recovery or
+congestion control. The punch packet is not expected to be
 acknowledged, and declaring it lost would cause a spurious congestion
-response on the relayed path. Skipping a packet number in this way is
-permitted ([@!RFC9000, section 21.4]).
+response on the relayed path. From the peer's point of view the number
+is skipped, which is permitted ([@!RFC9000, section 21.4]).
 
 ## Receiving a Punch Packet
 
@@ -297,11 +334,24 @@ with a connection, because its Destination Connection ID was never
 issued. The client handles it as any packet with an unknown connection
 ID ([@!RFC9000, section 5.2]): the packet is discarded.
 
+A client that uses zero-length connection IDs associates packets with
+connections by local address and port ([@!RFC9000, section 5.2.1]), and
+might therefore attempt to process a punch packet that arrives on the
+base associated with its candidate. The punch packet cannot be
+authenticated by the client, because the client parses the header
+differently from how the server constructed it, or because the packet
+consists of random bytes. The client discards it as it would any packet
+that fails authentication. Such a failure counts toward the integrity
+limit of the connection's keys ([@!RFC9001, section 6.6]); this is
+negligible, as the number of punch packets is small.
+
 The client might respond with a Stateless Reset
-([@!RFC9000, section 10.3]). This is harmless. The Stateless Reset is
-smaller than the punch packet, it cannot match a stateless reset token
-issued for the connection, and it is sent toward an address the server
-has advertised. Endpoints SHOULD NOT treat the receipt of a punch packet
+([@!RFC9000, section 10.3]). This is harmless. Its size is bounded by
+the rules in [@!RFC9000, section 10.3]: it is normally smaller than the
+punch packet ([@!RFC9000, section 10.3.3]) and is never three or more
+times larger. It cannot match a stateless reset token issued for the
+connection, and it is sent toward an address the server has advertised
+and from which the server sent the punch packet. Endpoints SHOULD NOT treat the receipt of a punch packet
 as an error, and implementations are encouraged not to log it at a
 level that suggests a fault.
 
@@ -350,20 +400,42 @@ If validation fails, the client abandons the attempt:
 
 The client MAY then start a new attempt for the same pair by sending a
 new PUNCH_ME_NOW frame. Each attempt consumes a fresh server-issued
-connection ID, as required by [@!RFC9000, section 9.5]. Because failed
-attempts release their connection IDs, the number of connection IDs or
-Path IDs needed is bounded by the number of attempts in progress at
-the same time, not by the total number of attempts. The client controls
-this number through its active_connection_id_limit transport parameter,
-or its maximum Path ID when QUIC multipath is used.
+connection ID, as required by [@!RFC9000, section 9.5].
 
-# Migration
+Without QUIC multipath, failed attempts release their connection IDs,
+so the number of connection IDs needed is bounded by the number of
+attempts in progress at the same time, not by the total number of
+attempts. The client controls this number through its
+active_connection_id_limit transport parameter.
+
+With QUIC multipath, a Path ID cannot be reused once its path has been
+abandoned, so each attempt consumes a Path ID permanently. The number
+of attempts is therefore bounded by the maximum Path ID advertised by
+the server. A server that has negotiated both this extension and QUIC
+multipath SHOULD increase the maximum Path ID using MAX_PATH_ID frames
+as paths are abandoned, so that failed attempts do not prevent further
+attempts. A client that cannot start an attempt because it has run out
+of Path IDs can signal this with a PATHS_BLOCKED frame.
+
+# Migration {#migration}
 
 Once a direct path has been validated, the client can migrate the
 connection to it ([@!RFC9000, section 9]) or, when QUIC multipath is
 used, send application data on it. How the client chooses among
 validated paths, and whether it keeps the relayed path, is out of scope
 for this document.
+
+The client's path validation verifies only the server's address. When
+the client migrates by sending non-probing frames on the new path, the
+server validates the client's address as required by
+[@!RFC9000, section 9.3]; with QUIC multipath, the server likewise
+validates the new path before using it. This is ordinary server
+behavior, not part of this extension, and takes place only after the
+client has validated the path, so both NAT bindings already exist and
+the validation is expected to succeed. Until it completes, the server
+is limited by the anti-amplification limit
+([@!RFC9000, section 8]), which can add up to one round trip of the
+direct path before the server can send at full rate.
 
 Because all new paths are initiated by the client, this extension does
 not require the server to migrate the connection, consistent with
@@ -432,13 +504,17 @@ validated. This is similar to the request forgery risk discussed in
 [@!RFC9000, section 21.5]. The following properties limit the
 exposure:
 
-* The server sends at most one packet per request, the packet is no
-  larger than the packet carrying the request, and the total bytes sent
-  in punch packets are bounded by the bytes received in requests
-  ((#limits)). The extension therefore provides no amplification.
+* The server sends at most one punch packet per received packet,
+  however many requests that packet contains, and the punch packet is
+  no larger than the packet carrying the request ((#limits)). The
+  extension therefore provides no amplification, in either packets or
+  bytes, and unused allowance cannot be accumulated into a burst.
 
-* Punch packets are not retransmitted and carry no content that the
-  target can act on. Their contents are not chosen by the client.
+* Punch packets are not retransmitted and their contents are not chosen
+  by the client. However, the client chooses the destination address
+  and port, so a punch packet could reach a service, or create state in
+  a firewall, that an off-path attacker could not reach directly. The
+  restrictions on destinations in (#limits) address this.
 
 * The server does not send PATH_CHALLENGE frames or any other frames of
   the connection on unvalidated paths as part of this extension. All
@@ -449,8 +525,13 @@ exposure:
 
 Each punch packet creates a binding in NATs on the server side. A
 client sending many requests could exhaust the mapping table of the
-server's NAT, affecting other flows. Servers SHOULD rate-limit punch
-packets ((#limits)).
+server's NAT, affecting other flows. Servers rate-limit punch packets
+for this reason ((#limits)).
+
+A punch packet can elicit a Stateless Reset from the client's endpoint.
+Its size is bounded relative to the punch packet as described in
+[@!RFC9000, section 10.3], and it is sent toward the server's own
+sending base.
 
 Punch requests are carried inside an authenticated QUIC connection and
 cannot be forged by an off-path attacker.
@@ -523,7 +604,8 @@ the server taking part in path validation for each attempt:
   active_connection_id_limit. In this document, the server sends no
   packet of the connection on an unvalidated path, and the client's
   validation uses ordinary connection IDs whose consumption is bounded
-  by the number of concurrent attempts ((#validation)).
+  by the number of concurrent attempts, or, with QUIC multipath, by the
+  Path IDs that the server makes available ((#validation)).
 
 * PUNCH_DONE is needed so that both endpoints can release per-attempt
   state. A stateless server has nothing to release.
@@ -540,8 +622,8 @@ the server taking part in path validation for each attempt:
 
 * Grants and MAX_PUNCH_GRANTS let both endpoints bound the work per
   connection. Here, the server bounds its work with a local rate limit,
-  and the client bounds its own through the limits it already
-  advertises.
+  and the existing connection ID and Path ID limits bound the number of
+  concurrent attempts.
 
 * Referencing server candidates by advertisement sequence number and
   entry index requires rules for keeping entries stable across
@@ -640,6 +722,17 @@ by Christian Huitema in [@?ISSUE20].
   </front>
   <seriesInfo name="RFC" value="9000"/>
   <seriesInfo name="DOI" value="10.17487/RFC9000"/>
+</reference>
+
+<reference anchor="RFC9001" target="https://www.rfc-editor.org/info/rfc9001">
+  <front>
+    <title>Using TLS to Secure QUIC</title>
+    <author initials="M." surname="Thomson" fullname="M. Thomson" role="editor"/>
+    <author initials="S." surname="Turner" fullname="S. Turner" role="editor"/>
+    <date year="2021" month="May"/>
+  </front>
+  <seriesInfo name="RFC" value="9001"/>
+  <seriesInfo name="DOI" value="10.17487/RFC9001"/>
 </reference>
 
 <reference anchor="RFC9002" target="https://www.rfc-editor.org/info/rfc9002">
