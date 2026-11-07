@@ -64,8 +64,7 @@ that draft [@?ISSUE20]. The server's only extension-specific action is
 to send one small, opaque packet per request. This packet creates the
 binding in the server-side NAT or firewall; it is not expected to be
 processed by the client. All path validation is initiated by the client
-and follows [@!RFC9000] (or [@!I-D.ietf-quic-multipath]) without
-modification.
+and follows [@!RFC9000] (or [@!RFC10069]) without modification.
 
 The design has the following properties:
 
@@ -380,8 +379,8 @@ client candidate to the server candidate.
   [@!RFC9000, section 8.2], using a connection ID issued by the server
   that has not been used on any other path.
 
-* With QUIC multipath [@!I-D.ietf-quic-multipath], the client opens a
-  new path using an unused Path ID, as for any other new path.
+* With QUIC multipath [@!RFC10069], the client opens a new path using
+  an unused Path ID, as for any other new path.
 
 The server responds as it would to any client-initiated path validation
 or new path; no behavior specific to this extension is required on the
@@ -413,13 +412,14 @@ attempts. The client controls this number through its
 active_connection_id_limit transport parameter.
 
 With QUIC multipath, a Path ID cannot be reused once its path has been
-abandoned, so each attempt consumes a Path ID permanently. The number
-of attempts is therefore bounded by the maximum Path ID advertised by
-the server. A server that has negotiated both this extension and QUIC
-multipath SHOULD increase the maximum Path ID using MAX_PATH_ID frames
-as paths are abandoned, so that failed attempts do not prevent further
-attempts. A client that cannot start an attempt because it has run out
-of Path IDs can signal this with a PATHS_BLOCKED frame.
+abandoned ([@!RFC10069, section 3.4]), so each attempt consumes a Path
+ID permanently. The number of attempts is therefore bounded by the
+maximum Path ID advertised by the server. A server that has negotiated
+both this extension and QUIC multipath SHOULD increase the maximum Path
+ID using MAX_PATH_ID frames ([@!RFC10069, section 4.6]) as paths are
+abandoned, so that failed attempts do not prevent further attempts. A
+client that cannot start an attempt because it has run out of Path IDs
+can signal this with a PATHS_BLOCKED frame ([@!RFC10069, section 4.7]).
 
 # Migration {#migration}
 
@@ -772,6 +772,21 @@ by Christian Huitema in [@?ISSUE20].
   <seriesInfo name="DOI" value="10.17487/RFC9002"/>
 </reference>
 
+<reference anchor="RFC10069" target="https://www.rfc-editor.org/info/rfc10069">
+  <front>
+    <title>Managing Multiple Paths for a QUIC Connection</title>
+    <author initials="Y." surname="Liu" fullname="Y. Liu" role="editor"/>
+    <author initials="Y." surname="Ma" fullname="Y. Ma"/>
+    <author initials="Q." surname="De Coninck" fullname="Q. De Coninck" role="editor"/>
+    <author initials="O." surname="Bonaventure" fullname="O. Bonaventure"/>
+    <author initials="C." surname="Huitema" fullname="C. Huitema"/>
+    <author initials="M." surname="Kühlewind" fullname="M. Kühlewind" role="editor"/>
+    <date year="2026" month="November"/>
+  </front>
+  <seriesInfo name="RFC" value="10069"/>
+  <seriesInfo name="DOI" value="10.17487/RFC10069"/>
+</reference>
+
 <reference anchor="RFC8445" target="https://www.rfc-editor.org/info/rfc8445">
   <front>
     <title>Interactive Connectivity Establishment (ICE): A Protocol for Network Address Translator (NAT) Traversal</title>
@@ -816,20 +831,6 @@ by Christian Huitema in [@?ISSUE20].
     <date year="2026" month="August" day="24"/>
   </front>
   <seriesInfo name="Internet-Draft" value="draft-ietf-masque-connect-udp-listen-16"/>
-</reference>
-
-<reference anchor="I-D.ietf-quic-multipath" target="https://datatracker.ietf.org/doc/html/draft-ietf-quic-multipath-21">
-  <front>
-    <title>Managing multiple paths for a QUIC connection</title>
-    <author initials="Y." surname="Liu" fullname="Y. Liu"/>
-    <author initials="Y." surname="Ma" fullname="Y. Ma"/>
-    <author initials="Q." surname="De Coninck" fullname="Q. De Coninck"/>
-    <author initials="O." surname="Bonaventure" fullname="O. Bonaventure"/>
-    <author initials="C." surname="Huitema" fullname="C. Huitema"/>
-    <author initials="M." surname="Kühlewind" fullname="M. Kühlewind"/>
-    <date year="2026" month="March" day="17"/>
-  </front>
-  <seriesInfo name="Internet-Draft" value="draft-ietf-quic-multipath-21"/>
 </reference>
 
 <reference anchor="I-D.munizaga-quic-alternative-server-address" target="https://datatracker.ietf.org/doc/html/draft-munizaga-quic-alternative-server-address-02">
