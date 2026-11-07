@@ -30,8 +30,8 @@ connected through a relay establish a direct path between them when one
 or both are behind Network Address Translators (NATs). The client asks
 the server, over the existing connection, to send a single small "punch"
 packet toward one of the client's address candidates. The server keeps
-no per-attempt state and never initiates path validation. After a short
-delay, the client validates the direct path using ordinary
+no per-attempt state and does not initiate validation of candidate
+paths. After a short delay, the client validates the direct path using ordinary
 client-initiated path validation as defined in RFC 9000, or ordinary
 path creation as defined in RFC 10069 when QUIC multipath is in use,
 and can then migrate the connection to it.
@@ -63,8 +63,11 @@ based on a design suggested by Christian Huitema in the discussion of
 that draft [@?ISSUE20]. The server's only extension-specific action is
 to send one small, opaque packet per request. This packet creates the
 binding in the server-side NAT or firewall; it is not expected to be
-processed by the client. All path validation is initiated by the client
-and follows [@!RFC9000] (or [@!RFC10069]) without modification.
+processed by the client. Validation of each candidate path is initiated
+by the client and follows [@!RFC9000] (or [@!RFC10069]) without
+modification. The only path validation the server performs is the
+ordinary validation of the client's address when the client migrates
+to a validated path ((#migration)).
 
 The design has the following properties:
 
@@ -596,7 +599,7 @@ and differ only in how probing is coordinated.
 
 | Aspect                         | seemann-04                                   | This document                         |
 |:-------------------------------|:---------------------------------------------|:--------------------------------------|
-| Server-initiated validation    | Yes                                          | No                                    |
+| Server-initiated validation of candidate paths | Yes                                          | No                                    |
 | Server state per attempt       | Grant, two punching CIDs, status             | None                                  |
 | Server packets before validation | PATH_CHALLENGE probes, retransmitted until timeout | One small punch packet         |
 | New frames                     | 4 (PUNCH_GRANT, MAX_PUNCH_GRANTS, PUNCH_REQUEST, PUNCH_DONE) | 1 (PUNCH_ME_NOW) |
