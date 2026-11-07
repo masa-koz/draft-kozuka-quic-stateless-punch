@@ -15,8 +15,8 @@ packet toward one of the client's address candidates. The server keeps
 no per-attempt state and never initiates path validation. After a short
 delay, the client validates the direct path using ordinary
 client-initiated path validation as defined in RFC 9000, or ordinary
-path creation when QUIC multipath is in use, and can then migrate the
-connection to it. 
+path creation as defined in RFC 10069 when QUIC multipath is in use,
+and can then migrate the connection to it. 
     " name="description">
 <meta content="xml2rfc 3.35.0" name="generator">
 <meta content="QUIC" name="keyword">
@@ -1096,8 +1096,8 @@ packet toward one of the client's address candidates. The server keeps
 no per-attempt state and never initiates path validation. After a short
 delay, the client validates the direct path using ordinary
 client-initiated path validation as defined in RFC 9000, or ordinary
-path creation when QUIC multipath is in use, and can then migrate the
-connection to it.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+path creation as defined in RFC 10069 when QUIC multipath is in use,
+and can then migrate the connection to it.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 </section>
 <section class="note rfcEditorRemove" id="section-note.1">
       <h2 id="name-discussion-venues">
@@ -1559,7 +1559,8 @@ subject to the datagram size requirements of <span><a href="https://rfc-editor.o
 protection, it takes the packet number from the application data
 packet number space of the path on which the PUNCH_ME_NOW frame was
 received; with QUIC multipath, this is the packet number space of that
-path's Path ID, which is also used to form the nonce. The packet number
+path's Path ID, which is also used to form the nonce
+(<span><a href="https://rfc-editor.org/rfc/rfc10069#section-2.4" class="relref">Section 2.4</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>). The packet number
 is consumed: the server MUST NOT use it for any other packet, as reusing
 a packet number with the same key and Path ID would reuse the AEAD
 nonce. The packet number MUST NOT be tracked for loss recovery or
@@ -1656,14 +1657,20 @@ attempts in progress at the same time, not by the total number of
 attempts. The client controls this number through its
 active_connection_id_limit transport parameter.<a href="#section-7-10" class="pilcrow">¶</a></p>
 <p id="section-7-11">With QUIC multipath, a Path ID cannot be reused once its path has been
-abandoned (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-3.4" class="relref">Section 3.4</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>), so each attempt consumes a Path
-ID permanently. The number of attempts is therefore bounded by the
-maximum Path ID advertised by the server. A server that has negotiated
-both this extension and QUIC multipath SHOULD increase the maximum Path
-ID using MAX_PATH_ID frames (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-4.6" class="relref">Section 4.6</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>) as paths are
-abandoned, so that failed attempts do not prevent further attempts. A
-client that cannot start an attempt because it has run out of Path IDs
-can signal this with a PATHS_BLOCKED frame (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-4.7" class="relref">Section 4.7</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>).<a href="#section-7-11" class="pilcrow">¶</a></p>
+abandoned (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-3.4" class="relref">Section 3.4</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>), because the Path ID is part of
+the nonce calculation (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-2.4" class="relref">Section 2.4</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>). Each attempt
+therefore consumes a Path ID permanently. Opening a path requires
+connection IDs for the same Path ID from both endpoints, so the number
+of attempts is bounded by the maximum Path ID limits of both endpoints
+(<span><a href="https://rfc-editor.org/rfc/rfc10069#section-3.2.1" class="relref">Section 3.2.1</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>). When this extension and QUIC multipath
+are both in use, each endpoint SHOULD increase its maximum Path ID
+using MAX_PATH_ID frames (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-4.6" class="relref">Section 4.6</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>) as paths are
+abandoned, and SHOULD issue connection IDs for the newly allowed Path
+IDs using PATH_NEW_CONNECTION_ID frames, so that failed attempts do not
+prevent further attempts. A client that cannot start an attempt follows
+<span><a href="https://rfc-editor.org/rfc/rfc10069#section-3.2.1" class="relref">Section 3.2.1</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>: it sends a PATHS_BLOCKED frame if it has
+no unused Path ID, or a PATH_CIDS_BLOCKED frame if it has no connection
+ID for an unused Path ID (<span><a href="https://rfc-editor.org/rfc/rfc10069#section-4.7" class="relref">Section 4.7</a> of [<a href="#RFC10069" class="cite xref">RFC10069</a>]</span>).<a href="#section-7-11" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="migration">
