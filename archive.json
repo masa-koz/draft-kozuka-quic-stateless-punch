@@ -1,0 +1,144 @@
+{
+  "magic": "E!vIA5L86J2I",
+  "timestamp": "2026-11-10T00:26:50.978604+00:00",
+  "repo": "masa-koz/draft-kozuka-quic-stateless-punch",
+  "labels": [
+    {
+      "name": "accessibility",
+      "description": "Barrier affecting people with disabilities",
+      "color": "f143ab"
+    },
+    {
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "name": "documentation",
+      "description": "Improvements or additions to documentation",
+      "color": "0075ca"
+    },
+    {
+      "name": "duplicate",
+      "description": "This issue or pull request already exists",
+      "color": "cfd3d7"
+    },
+    {
+      "name": "enhancement",
+      "description": "New feature or request",
+      "color": "a2eeef"
+    },
+    {
+      "name": "good first issue",
+      "description": "Good for newcomers",
+      "color": "7057ff"
+    },
+    {
+      "name": "help wanted",
+      "description": "Extra attention is needed",
+      "color": "008672"
+    },
+    {
+      "name": "invalid",
+      "description": "This doesn't seem right",
+      "color": "e4e669"
+    },
+    {
+      "name": "question",
+      "description": "Further information is requested",
+      "color": "d876e3"
+    },
+    {
+      "name": "wontfix",
+      "description": "This will not be worked on",
+      "color": "ffffff"
+    }
+  ],
+  "issues": [],
+  "pulls": [
+    {
+      "number": 1,
+      "id": "PR_kwDOVmiEMs8AAAABNkQgZQ",
+      "title": "Address review findings in protocol text",
+      "url": "https://github.com/masa-koz/draft-kozuka-quic-stateless-punch/pull/1",
+      "state": "MERGED",
+      "author": "masa-koz",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "Fixes the issues found by a review of the -00 text before submission.\n\n## Protocol fixes\n- **Amplification (\u00a7Limits, \u00a7Security):** at most one punch packet per *received packet*, however many PUNCH_ME_NOW frames it carries. Clients SHOULD send each request in its own packet. The rate limit is now a MUST. This closes off packet-count amplification and the saved-up byte budget released as a burst.\n- **Request forgery (\u00a7Limits, \u00a7Security):** SHOULD NOT punch toward loopback, link-local or internal-only addresses. The server MAY refuse sensitive ports, following RFC 9000 \u00a721.5.6.\n- **Multipath Path IDs (\u00a7Validation):** abandoned Path IDs can't be reused, so each attempt uses one up for good. The server SHOULD raise MAX_PATH_ID, and the client can send PATHS_BLOCKED. The appendix comparison is updated to match.\n- **Header protection (\u00a7Punch Packets):** a 1-RTT punch packet MUST be long enough for the header-protection sample (RFC 9001 \u00a75.4.2).\n- **Packet number (\u00a7Punch Packets):** says which packet number space to use (per path under multipath), and the number is consumed so the AEAD nonce is never reused.\n\n## Clarifications\n- Intro property reworded. New text in \u00a7Migration: the server validates the client's address on migration (RFC 9000 \u00a79.3), which can add one round trip.\n- The \"exactly one sending base per address\" claim is softened to match Open Issues.\n- Clients using zero-length connection IDs are covered (the packet fails authentication; this counts toward the integrity limit).\n- The Stateless Reset size statement is corrected (RFC 9000 \u00a710.3 / \u00a710.3.3).\n- Added an RFC 9001 reference.\n- CODEOWNERS now uses `@masa-koz` instead of an email that may not be verified. Note: `make update-codeowners` will regenerate it from the draft's author email.\n\n## Not changed\nThe Implementation Status section still says the SEERA punch packet is sent \"without padding\". Please confirm whether the implementation meets the header-protection minimum, and update that text or the \"Differences\" list.\n\nThe draft was not built locally. Please check the CI build of this PR.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_017y5d6Q8X4o97d43Bb4XLhE\n",
+      "createdAt": "2026-11-07T20:09:28Z",
+      "updatedAt": "2026-11-07T20:15:17Z",
+      "baseRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "baseRefName": "main",
+      "baseRefOid": "fa8da492c5b91e27f4f5af165e1e2f6b841bbc77",
+      "headRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "headRefName": "fix-review-findings",
+      "headRefOid": "aa8ebff298a7c2a37dd65bb75935b8baa87968bc",
+      "closedAt": "2026-11-07T20:15:12Z",
+      "mergedAt": "2026-11-07T20:15:12Z",
+      "mergedBy": "masa-koz",
+      "mergeCommit": {
+        "oid": "915fff60e649dd7ba999c5dd097eb72e584ac33b"
+      },
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 2,
+      "id": "PR_kwDOVmiEMs8AAAABNkVA9g",
+      "title": "Fix BCP 14 boilerplate for mmark",
+      "url": "https://github.com/masa-koz/draft-kozuka-quic-stateless-punch/pull/2",
+      "state": "MERGED",
+      "author": "masa-koz",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "`{::boilerplate bcp14-tagged}` is kramdown-rfc syntax. mmark doesn't process it, so the published draft showed it as literal text in Section 2. The BCP 14 key-words paragraph and the RFC 2119/8174 references were missing as a result.\n\n- Replace the directive with the standard RFC 8174 key-words paragraph, citing `[@!RFC2119] [@!RFC8174]`.\n- Add `<reference>` entries for RFC 2119 and RFC 8174, matching the existing explicit references.\n\nNo other kramdown-only syntax was found. The rendered text has no other leftover `{...}` markup.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_017y5d6Q8X4o97d43Bb4XLhE\n",
+      "createdAt": "2026-11-07T20:19:53Z",
+      "updatedAt": "2026-11-07T20:21:15Z",
+      "baseRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "baseRefName": "main",
+      "baseRefOid": "915fff60e649dd7ba999c5dd097eb72e584ac33b",
+      "headRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "headRefName": "fix-bcp14-boilerplate",
+      "headRefOid": "12f0a077c7e61bbefd13de9a1f05f82a0bfa6ef9",
+      "closedAt": "2026-11-07T20:21:11Z",
+      "mergedAt": "2026-11-07T20:21:11Z",
+      "mergedBy": "masa-koz",
+      "mergeCommit": {
+        "oid": "00ec7ded8b0be9ad456fa355becbdd488a19ca08"
+      },
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 3,
+      "id": "PR_kwDOVmiEMs8AAAABNkhr8w",
+      "title": "Cite RFC 10069 for QUIC multipath",
+      "url": "https://github.com/masa-koz/draft-kozuka-quic-stateless-punch/pull/3",
+      "state": "MERGED",
+      "author": "masa-koz",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "QUIC multipath has been published as [RFC 10069](https://www.rfc-editor.org/info/rfc10069) (Proposed Standard, November 2026).\n\n- Replace every `[@!I-D.ietf-quic-multipath]` with `[@!RFC10069]`, and swap the draft-21 `<reference>` for an RFC 10069 entry. The entry uses the RFC's author list with editor roles and DOI `10.17487/RFC10069`.\n- Add section citations to the multipath text:\n  - Path IDs are never reused after abandonment: RFC 10069 \u00a73.4\n  - MAX_PATH_ID: \u00a74.6\n  - PATHS_BLOCKED: \u00a74.7\n\nThe RFC still has the PATH_ABANDON, MAX_PATH_ID and PATHS_BLOCKED frames and the rule against reusing path IDs. The draft's multipath text needed no other changes.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_017y5d6Q8X4o97d43Bb4XLhE\n",
+      "createdAt": "2026-11-07T20:44:52Z",
+      "updatedAt": "2026-11-07T20:58:32Z",
+      "baseRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "baseRefName": "main",
+      "baseRefOid": "00ec7ded8b0be9ad456fa355becbdd488a19ca08",
+      "headRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "headRefName": "rfc10069",
+      "headRefOid": "c1036c9f18aed2ba1acfd68c9fabc0bf49740e65",
+      "closedAt": "2026-11-07T20:58:28Z",
+      "mergedAt": "2026-11-07T20:58:27Z",
+      "mergedBy": "masa-koz",
+      "mergeCommit": {
+        "oid": "0fe4d33459bbbe5f1f740c7252ac6f17ee5d18ed"
+      },
+      "comments": [],
+      "reviews": []
+    }
+  ]
+}
