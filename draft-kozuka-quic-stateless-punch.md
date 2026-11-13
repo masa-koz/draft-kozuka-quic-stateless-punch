@@ -701,12 +701,14 @@ Differences from this document:
 
 Maturity:
 : Not yet deployed in a production environment. On a QEMU-based testbed,
-  a direct path was established through a cone NAT but not through a
-  symmetric firewall. A direct path was also established through an
-  IPv6 firewall. The implementation has also been tested between
-  network namespaces behind emulated NATs with endpoint-independent
-  mapping; as expected, traversal fails when a NAT uses
-  endpoint-dependent mapping.
+  a direct path was established through a cone NAT, and through an
+  IPv6 firewall that admits inbound packets only from an address and
+  port to which an outbound packet has been sent (address- and
+  port-dependent filtering, [@?RFC4787, section 5]). As expected, no
+  direct path was established through a symmetric firewall that
+  assigns a different port for each destination (endpoint-dependent
+  mapping). The implementation has also been tested between network
+  namespaces behind emulated NATs.
 
 Licensing:
 : MIT
