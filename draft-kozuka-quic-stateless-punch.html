@@ -2101,37 +2101,65 @@ Internet-Draft, and is based on a proposal described in <span>[<a href="#RFC7942
           <dd class="break"></dd>
 <dt id="appendix-B.1-1.3">Description:</dt>
           <dd style="margin-left: 1.5em" id="appendix-B.1-1.4">A fork of MsQuic that migrates connections carried over a MASQUE
-relay to a direct path. The server processes punch requests without
-keeping per-attempt state and sends a single punch packet, formatted
-as a short-header packet protected with the connection's 1-RTT keys,
-with a random Destination Connection ID and a single PING frame,
-without padding. The client starts path validation after the smoothed
-RTT of the relayed path.<a href="#appendix-B.1-1.4" class="pilcrow">¶</a>
+relay to a direct path. It implements the PUNCH_ME_NOW frame
+(0x5eea90 and 0x5eea91) and the stateless_punch transport parameter
+(0x5eea9e7a) as specified in this document, with server candidates
+advertised using ALTERNATIVE_ADDRESS frames as defined in
+draft-munizaga-quic-alternative-server-address-02.<a href="#appendix-B.1-1.4" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
-<dt id="appendix-B.1-1.5">Differences from this document:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-1.6">The implementation predates this document. It identifies the server
-candidate by the sequence number of an ADD_ADDRESS frame as defined
-in draft-seemann-quic-nat-traversal-02, carries an additional Round
-field, and uses the frame types 0x3d7e92 and 0x3d7e93.<a href="#appendix-B.1-1.6" class="pilcrow">¶</a>
+<dt id="appendix-B.1-1.5">Server behavior:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.6">The server looks up the named server candidate by address and port
+and keeps no per-attempt state. It sends at most one punch packet per
+received packet and at most 10 punch packets per second on a
+connection, using a fixed one-second window so that unused allowance
+is not carried over. It refuses multicast, broadcast, unspecified,
+loopback, and link-local destinations, and a small set of destination
+ports (53, 123, 137, 161, 389, 1900, and 11211). The punch packet
+consists of random bytes behind a short header with a random
+Destination Connection ID, rather than a protected 1-RTT packet, so
+it uses no packet number. It is no larger than the packet that
+carried the request, or 64 bytes, whichever is smaller.<a href="#appendix-B.1-1.6" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
-<dt id="appendix-B.1-1.7">Maturity:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-1.8">Used in a relay service operated by SEERA Networks in trial
-deployment.<a href="#appendix-B.1-1.8" class="pilcrow">¶</a>
+<dt id="appendix-B.1-1.7">Client behavior:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.8">The client sends each PUNCH_ME_NOW frame in a separate packet and
+retransmits it if lost. It waits the smoothed RTT of the relayed path
+and then validates the path from the local address and port behind
+the client candidate named in the request. On failure, it retires the
+connection ID used for the attempt, or abandons the path when QUIC
+multipath is in use.<a href="#appendix-B.1-1.8" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
-<dt id="appendix-B.1-1.9">Licensing:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-1.10">MIT<a href="#appendix-B.1-1.10" class="pilcrow">¶</a>
+<dt id="appendix-B.1-1.9">Differences from this document:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.10">The server ignores PUNCH_ME_NOW frames received before the handshake
+is confirmed. When several sending bases share an advertised address
+(see <a href="#open-issues" class="auto internal xref">Appendix C</a>), the server uses the first matching one.<a href="#appendix-B.1-1.10" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
-<dt id="appendix-B.1-1.11">Repository:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-1.12">
-            <span><a href="https://github.com/seera-networks/msquic">https://github.com/seera-networks/msquic</a></span><a href="#appendix-B.1-1.12" class="pilcrow">¶</a>
+<dt id="appendix-B.1-1.11">Maturity:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.12">Not yet deployed in a production environment. On a QEMU-based testbed,
+a direct path was established through a cone NAT, and through an
+IPv6 firewall that admits inbound packets only from an address and
+port to which an outbound packet has been sent (address- and
+port-dependent filtering, <span><a href="https://rfc-editor.org/rfc/rfc4787#section-5" class="relref">Section 5</a> of [<a href="#RFC4787" class="cite xref">RFC4787</a>]</span>). As expected, no
+direct path was established through a symmetric firewall that
+assigns a different port for each destination (endpoint-dependent
+mapping). The implementation has also been tested between network
+namespaces behind emulated NATs.<a href="#appendix-B.1-1.12" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
-<dt id="appendix-B.1-1.13">Contact:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-1.14">Masahiro Kozuka (kozuka@okayama-u.ac.jp)<a href="#appendix-B.1-1.14" class="pilcrow">¶</a>
+<dt id="appendix-B.1-1.13">Licensing:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.14">MIT<a href="#appendix-B.1-1.14" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.15">Repository:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.16">
+            <span><a href="https://github.com/seera-networks/msquic">https://github.com/seera-networks/msquic</a></span><a href="#appendix-B.1-1.16" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.17">Contact:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.18">Masahiro Kozuka (kozuka@okayama-u.ac.jp)<a href="#appendix-B.1-1.18" class="pilcrow">¶</a>
 </dd>
         <dd class="break"></dd>
 </dl>
