@@ -689,8 +689,8 @@ Server behavior:
 Client behavior:
 : The client sends each PUNCH_ME_NOW frame in a separate packet and
   retransmits it if lost. It waits the smoothed RTT of the relayed path
-  and then validates the path from the same local port that its
-  candidate's observed address maps to. On failure, it retires the
+  and then validates the path from the local address and port behind
+  the client candidate named in the request. On failure, it retires the
   connection ID used for the attempt, or abandons the path when QUIC
   multipath is in use.
 
