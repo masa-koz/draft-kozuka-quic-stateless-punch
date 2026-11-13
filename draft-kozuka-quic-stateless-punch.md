@@ -700,8 +700,9 @@ Differences from this document:
   (see (#open-issues)), the server uses the first matching one.
 
 Maturity:
-: Used in a relay service operated by SEERA Networks in trial
-  deployment. Tested between network namespaces behind emulated NATs
+: Not yet deployed in a production environment. Direct paths have been
+  established through NATs on a QEMU-based testbed. The implementation
+  has also been tested between network namespaces behind emulated NATs
   with endpoint-independent mapping; as expected, traversal fails when
   a NAT uses endpoint-dependent mapping.
 
