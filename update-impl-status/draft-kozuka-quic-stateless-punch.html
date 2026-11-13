@@ -2139,12 +2139,14 @@ is confirmed. When several sending bases share an advertised address
           <dd class="break"></dd>
 <dt id="appendix-B.1-1.11">Maturity:</dt>
           <dd style="margin-left: 1.5em" id="appendix-B.1-1.12">Not yet deployed in a production environment. On a QEMU-based testbed,
-a direct path was established through a cone NAT but not through a
-symmetric firewall. A direct path was also established through an
-IPv6 firewall. The implementation has also been tested between
-network namespaces behind emulated NATs with endpoint-independent
-mapping; as expected, traversal fails when a NAT uses
-endpoint-dependent mapping.<a href="#appendix-B.1-1.12" class="pilcrow">¶</a>
+a direct path was established through a cone NAT, and through an
+IPv6 firewall that admits inbound packets only from an address and
+port to which an outbound packet has been sent (address- and
+port-dependent filtering, <span><a href="https://rfc-editor.org/rfc/rfc4787#section-5" class="relref">Section 5</a> of [<a href="#RFC4787" class="cite xref">RFC4787</a>]</span>). As expected, no
+direct path was established through a symmetric firewall that
+assigns a different port for each destination (endpoint-dependent
+mapping). The implementation has also been tested between network
+namespaces behind emulated NATs.<a href="#appendix-B.1-1.12" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
 <dt id="appendix-B.1-1.13">Licensing:</dt>
