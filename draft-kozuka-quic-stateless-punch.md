@@ -667,22 +667,41 @@ Organization:
 
 Description:
 : A fork of MsQuic that migrates connections carried over a MASQUE
-  relay to a direct path. The server processes punch requests without
-  keeping per-attempt state and sends a single punch packet, formatted
-  as a short-header packet protected with the connection's 1-RTT keys,
-  with a random Destination Connection ID and a single PING frame,
-  without padding. The client starts path validation after the smoothed
-  RTT of the relayed path.
+  relay to a direct path. It implements the PUNCH_ME_NOW frame
+  (0x5eea90 and 0x5eea91) and the stateless_punch transport parameter
+  (0x5eea9e7a) as specified in this document, with server candidates
+  advertised using ALTERNATIVE_ADDRESS frames as defined in
+  draft-munizaga-quic-alternative-server-address-02.
+
+  The server looks up the named server candidate by address and port
+  and keeps no per-attempt state. It sends at most one punch packet per
+  received packet and at most 10 punch packets per second on a
+  connection, using a fixed one-second window so that unused allowance
+  is not carried over. It refuses multicast, broadcast, unspecified,
+  loopback, and link-local destinations, and a small set of destination
+  ports (53, 123, 137, 161, 389, 1900, and 11211). The punch packet
+  consists of random bytes behind a short header with a random
+  Destination Connection ID, rather than a protected 1-RTT packet, so
+  it uses no packet number. It is no larger than the packet that
+  carried the request, or 64 bytes, whichever is smaller.
+
+  The client sends each PUNCH_ME_NOW frame in a separate packet and
+  retransmits it if lost. It waits the smoothed RTT of the relayed path
+  and then validates the path from the same local port that its
+  candidate's observed address maps to. On failure, it retires the
+  connection ID used for the attempt, or abandons the path when QUIC
+  multipath is in use.
 
 Differences from this document:
-: The implementation predates this document. It identifies the server
-  candidate by the sequence number of an ADD_ADDRESS frame as defined
-  in draft-seemann-quic-nat-traversal-02, carries an additional Round
-  field, and uses the frame types 0x3d7e92 and 0x3d7e93.
+: The server ignores PUNCH_ME_NOW frames received before the handshake
+  is confirmed. When several sending bases share an advertised address
+  (see (#open-issues)), the server uses the first matching one.
 
 Maturity:
 : Used in a relay service operated by SEERA Networks in trial
-  deployment.
+  deployment. Tested between network namespaces behind emulated NATs
+  with endpoint-independent mapping; as expected, traversal fails when
+  a NAT uses endpoint-dependent mapping.
 
 Licensing:
 : MIT
