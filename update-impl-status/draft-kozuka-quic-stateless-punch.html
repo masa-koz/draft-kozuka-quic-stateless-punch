@@ -2107,50 +2107,54 @@ relay to a direct path. It implements the PUNCH_ME_NOW frame
 advertised using ALTERNATIVE_ADDRESS frames as defined in
 draft-munizaga-quic-alternative-server-address-02.<a href="#appendix-B.1-1.4" class="pilcrow">¶</a>
 </dd>
-        <dd class="break"></dd>
-</dl>
-<p id="appendix-B.1-2">The server looks up the named server candidate by address and port
-  and keeps no per-attempt state. It sends at most one punch packet per
-  received packet and at most 10 punch packets per second on a
-  connection, using a fixed one-second window so that unused allowance
-  is not carried over. It refuses multicast, broadcast, unspecified,
-  loopback, and link-local destinations, and a small set of destination
-  ports (53, 123, 137, 161, 389, 1900, and 11211). The punch packet
-  consists of random bytes behind a short header with a random
-  Destination Connection ID, rather than a protected 1-RTT packet, so
-  it uses no packet number. It is no larger than the packet that
-  carried the request, or 64 bytes, whichever is smaller.<a href="#appendix-B.1-2" class="pilcrow">¶</a></p>
-<p id="appendix-B.1-3">The client sends each PUNCH_ME_NOW frame in a separate packet and
-  retransmits it if lost. It waits the smoothed RTT of the relayed path
-  and then validates the path from the same local port that its
-  candidate's observed address maps to. On failure, it retires the
-  connection ID used for the attempt, or abandons the path when QUIC
-  multipath is in use.<a href="#appendix-B.1-3" class="pilcrow">¶</a></p>
-<span class="break"></span><dl class="dlCompact dlParallel" id="appendix-B.1-4">
-          <dt id="appendix-B.1-4.1">Differences from this document:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-4.2">The server ignores PUNCH_ME_NOW frames received before the handshake
-is confirmed. When several sending bases share an advertised address
-(see <a href="#open-issues" class="auto internal xref">Appendix C</a>), the server uses the first matching one.<a href="#appendix-B.1-4.2" class="pilcrow">¶</a>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.5">Server behavior:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.6">The server looks up the named server candidate by address and port
+and keeps no per-attempt state. It sends at most one punch packet per
+received packet and at most 10 punch packets per second on a
+connection, using a fixed one-second window so that unused allowance
+is not carried over. It refuses multicast, broadcast, unspecified,
+loopback, and link-local destinations, and a small set of destination
+ports (53, 123, 137, 161, 389, 1900, and 11211). The punch packet
+consists of random bytes behind a short header with a random
+Destination Connection ID, rather than a protected 1-RTT packet, so
+it uses no packet number. It is no larger than the packet that
+carried the request, or 64 bytes, whichever is smaller.<a href="#appendix-B.1-1.6" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
-<dt id="appendix-B.1-4.3">Maturity:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-4.4">Used in a relay service operated by SEERA Networks in trial
+<dt id="appendix-B.1-1.7">Client behavior:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.8">The client sends each PUNCH_ME_NOW frame in a separate packet and
+retransmits it if lost. It waits the smoothed RTT of the relayed path
+and then validates the path from the same local port that its
+candidate's observed address maps to. On failure, it retires the
+connection ID used for the attempt, or abandons the path when QUIC
+multipath is in use.<a href="#appendix-B.1-1.8" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.9">Differences from this document:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.10">The server ignores PUNCH_ME_NOW frames received before the handshake
+is confirmed. When several sending bases share an advertised address
+(see <a href="#open-issues" class="auto internal xref">Appendix C</a>), the server uses the first matching one.<a href="#appendix-B.1-1.10" class="pilcrow">¶</a>
+</dd>
+          <dd class="break"></dd>
+<dt id="appendix-B.1-1.11">Maturity:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.12">Used in a relay service operated by SEERA Networks in trial
 deployment. Tested between network namespaces behind emulated NATs
 with endpoint-independent mapping; as expected, traversal fails when
-a NAT uses endpoint-dependent mapping.<a href="#appendix-B.1-4.4" class="pilcrow">¶</a>
+a NAT uses endpoint-dependent mapping.<a href="#appendix-B.1-1.12" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
-<dt id="appendix-B.1-4.5">Licensing:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-4.6">MIT<a href="#appendix-B.1-4.6" class="pilcrow">¶</a>
+<dt id="appendix-B.1-1.13">Licensing:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.14">MIT<a href="#appendix-B.1-1.14" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
-<dt id="appendix-B.1-4.7">Repository:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-4.8">
-            <span><a href="https://github.com/seera-networks/msquic">https://github.com/seera-networks/msquic</a></span><a href="#appendix-B.1-4.8" class="pilcrow">¶</a>
+<dt id="appendix-B.1-1.15">Repository:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.16">
+            <span><a href="https://github.com/seera-networks/msquic">https://github.com/seera-networks/msquic</a></span><a href="#appendix-B.1-1.16" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
-<dt id="appendix-B.1-4.9">Contact:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-4.10">Masahiro Kozuka (kozuka@okayama-u.ac.jp)<a href="#appendix-B.1-4.10" class="pilcrow">¶</a>
+<dt id="appendix-B.1-1.17">Contact:</dt>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.18">Masahiro Kozuka (kozuka@okayama-u.ac.jp)<a href="#appendix-B.1-1.18" class="pilcrow">¶</a>
 </dd>
         <dd class="break"></dd>
 </dl>

@@ -824,26 +824,24 @@ B.1.  SEERA MsQuic
       parameter (0x5eea9e7a) as specified in this document, with server
       candidates advertised using ALTERNATIVE_ADDRESS frames as defined
       in draft-munizaga-quic-alternative-server-address-02.
-
-   The server looks up the named server candidate by address and port
-   and keeps no per-attempt state.  It sends at most one punch packet
-   per received packet and at most 10 punch packets per second on a
-   connection, using a fixed one-second window so that unused allowance
-   is not carried over.  It refuses multicast, broadcast, unspecified,
-   loopback, and link-local destinations, and a small set of destination
-   ports (53, 123, 137, 161, 389, 1900, and 11211).  The punch packet
-   consists of random bytes behind a short header with a random
-   Destination Connection ID, rather than a protected 1-RTT packet, so
-   it uses no packet number.  It is no larger than the packet that
-   carried the request, or 64 bytes, whichever is smaller.
-
-   The client sends each PUNCH_ME_NOW frame in a separate packet and
-   retransmits it if lost.  It waits the smoothed RTT of the relayed
-   path and then validates the path from the same local port that its
-   candidate's observed address maps to.  On failure, it retires the
-   connection ID used for the attempt, or abandons the path when QUIC
-   multipath is in use.
-
+   Server behavior:  The server looks up the named server candidate by
+      address and port and keeps no per-attempt state.  It sends at most
+      one punch packet per received packet and at most 10 punch packets
+      per second on a connection, using a fixed one-second window so
+      that unused allowance is not carried over.  It refuses multicast,
+      broadcast, unspecified, loopback, and link-local destinations, and
+      a small set of destination ports (53, 123, 137, 161, 389, 1900,
+      and 11211).  The punch packet consists of random bytes behind a
+      short header with a random Destination Connection ID, rather than
+      a protected 1-RTT packet, so it uses no packet number.  It is no
+      larger than the packet that carried the request, or 64 bytes,
+      whichever is smaller.
+   Client behavior:  The client sends each PUNCH_ME_NOW frame in a
+      separate packet and retransmits it if lost.  It waits the smoothed
+      RTT of the relayed path and then validates the path from the same
+      local port that its candidate's observed address maps to.  On
+      failure, it retires the connection ID used for the attempt, or
+      abandons the path when QUIC multipath is in use.
    Differences from this document:  The server ignores PUNCH_ME_NOW
       frames received before the handshake is confirmed.  When several
       sending bases share an advertised address (see Appendix C), the
