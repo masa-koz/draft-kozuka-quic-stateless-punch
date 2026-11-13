@@ -2125,8 +2125,8 @@ carried the request, or 64 bytes, whichever is smaller.<a href="#appendix-B.1-1.
 <dt id="appendix-B.1-1.7">Client behavior:</dt>
           <dd style="margin-left: 1.5em" id="appendix-B.1-1.8">The client sends each PUNCH_ME_NOW frame in a separate packet and
 retransmits it if lost. It waits the smoothed RTT of the relayed path
-and then validates the path from the same local port that its
-candidate's observed address maps to. On failure, it retires the
+and then validates the path from the local address and port behind
+the client candidate named in the request. On failure, it retires the
 connection ID used for the attempt, or abandons the path when QUIC
 multipath is in use.<a href="#appendix-B.1-1.8" class="pilcrow">¶</a>
 </dd>
