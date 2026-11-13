@@ -219,9 +219,18 @@ The client SHOULD send punch requests as soon as candidate pairs become
 available. It MAY delay requests in order to prioritize pairs or to
 limit the number of attempts in progress.
 
-On receiving a PUNCH_ME_NOW frame, the server looks up the server
-address and port among the IPv4 and IPv6 entries it has advertised in
-its most recent ALTERNATIVE_ADDRESS frame.
+The server MUST ignore a PUNCH_ME_NOW frame received before the
+handshake is confirmed ([@!RFC9001, section 4.1.2]). Data received
+before then, such as 0-RTT data, can be replayed by an attacker
+([@!RFC9001, section 9.2]), and a replayed request would cause the
+server to send a punch packet toward an address of the attacker's
+choosing. A legitimate client never sends a request this early: this
+extension is not remembered for 0-RTT, and PUNCH_ME_NOW frames are
+sent only in 1-RTT packets ((#negotiation)).
+
+On receiving a PUNCH_ME_NOW frame after the handshake is confirmed, the
+server looks up the server address and port among the IPv4 and IPv6
+entries it has advertised in its most recent ALTERNATIVE_ADDRESS frame.
 
 * If there is no matching entry, the server MUST ignore the frame. This
   can happen legitimately, because the client's request might have
@@ -548,7 +557,10 @@ Its size is bounded relative to the punch packet as described in
 sending base.
 
 Punch requests are carried inside an authenticated QUIC connection and
-cannot be forged by an off-path attacker.
+cannot be forged by an off-path attacker. A request in replayed 0-RTT
+data could otherwise cause a punch packet to be sent; the server
+therefore ignores requests received before the handshake is confirmed
+((#requests)).
 
 The Destination Connection ID of a punch packet is random and is not
 used on any other path, so punch packets cannot be correlated with
@@ -695,9 +707,9 @@ Client behavior:
   multipath is in use.
 
 Differences from this document:
-: The server ignores PUNCH_ME_NOW frames received before the handshake
-  is confirmed. When several sending bases share an advertised address
-  (see (#open-issues)), the server uses the first matching one.
+: None known. Where this document leaves a choice open, the server uses
+  the first matching sending base when several share an advertised
+  address (see (#open-issues)).
 
 Maturity:
 : Not yet deployed in a production environment. On a QEMU-based testbed,
