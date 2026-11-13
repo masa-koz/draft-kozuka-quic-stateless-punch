@@ -1456,31 +1456,39 @@ candidate and the server candidate of the pair.<a href="#section-5-1" class="pil
 <p id="section-5-2">The client SHOULD send punch requests as soon as candidate pairs become
 available. It MAY delay requests in order to prioritize pairs or to
 limit the number of attempts in progress.<a href="#section-5-2" class="pilcrow">¶</a></p>
-<p id="section-5-3">On receiving a PUNCH_ME_NOW frame, the server looks up the server
-address and port among the IPv4 and IPv6 entries it has advertised in
-its most recent ALTERNATIVE_ADDRESS frame.<a href="#section-5-3" class="pilcrow">¶</a></p>
+<p id="section-5-3">The server MUST ignore a PUNCH_ME_NOW frame received before the
+handshake is confirmed (<span><a href="https://rfc-editor.org/rfc/rfc9001#section-4.1.2" class="relref">Section 4.1.2</a> of [<a href="#RFC9001" class="cite xref">RFC9001</a>]</span>). Data received
+before then, such as 0-RTT data, can be replayed by an attacker
+(<span><a href="https://rfc-editor.org/rfc/rfc9001#section-9.2" class="relref">Section 9.2</a> of [<a href="#RFC9001" class="cite xref">RFC9001</a>]</span>), and a replayed request would cause the
+server to send a punch packet toward an address of the attacker's
+choosing. A legitimate client never sends a request this early: this
+extension is not remembered for 0-RTT, and PUNCH_ME_NOW frames are
+sent only in 1-RTT packets (<a href="#negotiation" class="auto internal xref">Section 9</a>).<a href="#section-5-3" class="pilcrow">¶</a></p>
+<p id="section-5-4">On receiving a PUNCH_ME_NOW frame after the handshake is confirmed, the
+server looks up the server address and port among the IPv4 and IPv6
+entries it has advertised in its most recent ALTERNATIVE_ADDRESS frame.<a href="#section-5-4" class="pilcrow">¶</a></p>
 <ul class="normal">
-<li class="normal" id="section-5-4.1">
-          <p id="section-5-4.1.1">If there is no matching entry, the server MUST ignore the frame. This
+<li class="normal" id="section-5-5.1">
+          <p id="section-5-5.1.1">If there is no matching entry, the server MUST ignore the frame. This
 can happen legitimately, because the client's request might have
 been sent before it processed an ALTERNATIVE_ADDRESS frame that
 withdrew the address. The server MUST NOT treat this as a connection
-error.<a href="#section-5-4.1.1" class="pilcrow">¶</a></p>
+error.<a href="#section-5-5.1.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-5-4.2">
-          <p id="section-5-4.2.1">Otherwise, the server sends one punch packet (<a href="#punch-packet" class="auto internal xref">Section 6</a>) from
+        <li class="normal" id="section-5-5.2">
+          <p id="section-5-5.2.1">Otherwise, the server sends one punch packet (<a href="#punch-packet" class="auto internal xref">Section 6</a>) from
 the sending base associated with the entry to the client address
-and port in the frame, subject to the limits in <a href="#limits" class="auto internal xref">Section 5.1</a>.<a href="#section-5-4.2.1" class="pilcrow">¶</a></p>
+and port in the frame, subject to the limits in <a href="#limits" class="auto internal xref">Section 5.1</a>.<a href="#section-5-5.2.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
-<p id="section-5-5">After sending the punch packet, or after ignoring the frame, the server
+<p id="section-5-6">After sending the punch packet, or after ignoring the frame, the server
 retains no state related to the request. In particular, the server does
 not create a path, does not allocate a connection ID, and does not
-report the result of the attempt.<a href="#section-5-5" class="pilcrow">¶</a></p>
-<p id="section-5-6">A server MAY decline to send a punch packet for any reason, for example
+report the result of the attempt.<a href="#section-5-6" class="pilcrow">¶</a></p>
+<p id="section-5-7">A server MAY decline to send a punch packet for any reason, for example
 because of the limits in <a href="#limits" class="auto internal xref">Section 5.1</a> or local policy about acceptable
 client addresses. The client learns of this only because its path
-validation fails.<a href="#section-5-6" class="pilcrow">¶</a></p>
+validation fails.<a href="#section-5-7" class="pilcrow">¶</a></p>
 <div id="limits">
 <section id="section-5.1">
         <h3 id="name-limits">
@@ -1812,7 +1820,10 @@ Its size is bounded relative to the punch packet as described in
 <span><a href="https://rfc-editor.org/rfc/rfc9000#section-10.3" class="relref">Section 10.3</a> of [<a href="#RFC9000" class="cite xref">RFC9000</a>]</span>, and it is sent toward the server's own
 sending base.<a href="#section-11-4" class="pilcrow">¶</a></p>
 <p id="section-11-5">Punch requests are carried inside an authenticated QUIC connection and
-cannot be forged by an off-path attacker.<a href="#section-11-5" class="pilcrow">¶</a></p>
+cannot be forged by an off-path attacker. A request in replayed 0-RTT
+data could otherwise cause a punch packet to be sent; the server
+therefore ignores requests received before the handshake is confirmed
+(<a href="#requests" class="auto internal xref">Section 5</a>).<a href="#section-11-5" class="pilcrow">¶</a></p>
 <p id="section-11-6">The Destination Connection ID of a punch packet is random and is not
 used on any other path, so punch packets cannot be correlated with
 other packets of the connection by an observer
@@ -2132,9 +2143,9 @@ multipath is in use.<a href="#appendix-B.1-1.8" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
 <dt id="appendix-B.1-1.9">Differences from this document:</dt>
-          <dd style="margin-left: 1.5em" id="appendix-B.1-1.10">The server ignores PUNCH_ME_NOW frames received before the handshake
-is confirmed. When several sending bases share an advertised address
-(see <a href="#open-issues" class="auto internal xref">Appendix C</a>), the server uses the first matching one.<a href="#appendix-B.1-1.10" class="pilcrow">¶</a>
+          <dd style="margin-left: 1.5em" id="appendix-B.1-1.10">None known. Where this document leaves a choice open, the server uses
+the first matching sending base when several share an advertised
+address (see <a href="#open-issues" class="auto internal xref">Appendix C</a>).<a href="#appendix-B.1-1.10" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
 <dt id="appendix-B.1-1.11">Maturity:</dt>

@@ -266,9 +266,19 @@ Table of Contents
    become available.  It MAY delay requests in order to prioritize pairs
    or to limit the number of attempts in progress.
 
-   On receiving a PUNCH_ME_NOW frame, the server looks up the server
-   address and port among the IPv4 and IPv6 entries it has advertised in
-   its most recent ALTERNATIVE_ADDRESS frame.
+   The server MUST ignore a PUNCH_ME_NOW frame received before the
+   handshake is confirmed (Section 4.1.2 of [RFC9001]).  Data received
+   before then, such as 0-RTT data, can be replayed by an attacker
+   (Section 9.2 of [RFC9001]), and a replayed request would cause the
+   server to send a punch packet toward an address of the attacker's
+   choosing.  A legitimate client never sends a request this early: this
+   extension is not remembered for 0-RTT, and PUNCH_ME_NOW frames are
+   sent only in 1-RTT packets (Section 9).
+
+   On receiving a PUNCH_ME_NOW frame after the handshake is confirmed,
+   the server looks up the server address and port among the IPv4 and
+   IPv6 entries it has advertised in its most recent ALTERNATIVE_ADDRESS
+   frame.
 
    *  If there is no matching entry, the server MUST ignore the frame.
       This can happen legitimately, because the client's request might
@@ -602,7 +612,10 @@ Table of Contents
    server's own sending base.
 
    Punch requests are carried inside an authenticated QUIC connection
-   and cannot be forged by an off-path attacker.
+   and cannot be forged by an off-path attacker.  A request in replayed
+   0-RTT data could otherwise cause a punch packet to be sent; the
+   server therefore ignores requests received before the handshake is
+   confirmed (Section 5).
 
    The Destination Connection ID of a punch packet is random and is not
    used on any other path, so punch packets cannot be correlated with
@@ -842,10 +855,9 @@ B.1.  SEERA MsQuic
       address and port behind the client candidate named in the request.
       On failure, it retires the connection ID used for the attempt, or
       abandons the path when QUIC multipath is in use.
-   Differences from this document:  The server ignores PUNCH_ME_NOW
-      frames received before the handshake is confirmed.  When several
-      sending bases share an advertised address (see Appendix C), the
-      server uses the first matching one.
+   Differences from this document:  None known.  Where this document
+      leaves a choice open, the server uses the first matching sending
+      base when several share an advertised address (see Appendix C).
    Maturity:  Not yet deployed in a production environment.  On a QEMU-
       based testbed, a direct path was established through a cone NAT,
       and through an IPv6 firewall that admits inbound packets only from
