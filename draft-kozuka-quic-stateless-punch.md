@@ -673,7 +673,8 @@ Description:
   advertised using ALTERNATIVE_ADDRESS frames as defined in
   draft-munizaga-quic-alternative-server-address-02.
 
-  The server looks up the named server candidate by address and port
+Server behavior:
+: The server looks up the named server candidate by address and port
   and keeps no per-attempt state. It sends at most one punch packet per
   received packet and at most 10 punch packets per second on a
   connection, using a fixed one-second window so that unused allowance
@@ -685,7 +686,8 @@ Description:
   it uses no packet number. It is no larger than the packet that
   carried the request, or 64 bytes, whichever is smaller.
 
-  The client sends each PUNCH_ME_NOW frame in a separate packet and
+Client behavior:
+: The client sends each PUNCH_ME_NOW frame in a separate packet and
   retransmits it if lost. It waits the smoothed RTT of the relayed path
   and then validates the path from the same local port that its
   candidate's observed address maps to. On failure, it retires the
