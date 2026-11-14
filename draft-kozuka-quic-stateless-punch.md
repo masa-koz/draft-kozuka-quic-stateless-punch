@@ -6,7 +6,7 @@ area = "Web and Internet Transport"
 workgroup = "QUIC"
 keyword = ["QUIC", "NAT traversal", "hole punching", "connection migration"]
 submissiontype = "IETF"
-date = 2026-11-07T00:00:00Z
+date = 2026-11-14T00:00:00Z
 
 [seriesInfo]
 name = "Internet-Draft"
