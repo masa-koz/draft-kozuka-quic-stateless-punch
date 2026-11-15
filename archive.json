@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2026-11-12T00:29:15.588445+00:00",
+  "timestamp": "2026-11-15T00:29:59.450983+00:00",
   "repo": "masa-koz/draft-kozuka-quic-stateless-punch",
   "labels": [
     {
@@ -136,6 +136,90 @@
       "mergedBy": "masa-koz",
       "mergeCommit": {
         "oid": "0fe4d33459bbbe5f1f740c7252ac6f17ee5d18ed"
+      },
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 4,
+      "id": "PR_kwDOVmiEMs8AAAABPAaw1Q",
+      "title": "Update SEERA MsQuic implementation status",
+      "url": "https://github.com/masa-koz/draft-kozuka-quic-stateless-punch/pull/4",
+      "state": "MERGED",
+      "author": "masa-koz",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "seera-networks/msquic now implements this document (#179, #180, #183, #194, #199, merged 2026-11-10 to 11-13). This updates Appendix B.1 to match. I checked each statement against the PR descriptions and the code at `2bb560e`.\n\n**Description:** the implementation supports PUNCH_ME_NOW `0x5eea90`/`0x5eea91` and `stateless_punch` `0x5eea9e7a`, together with ALTERNATIVE_ADDRESS from munizaga-02. The old ADD_ADDRESS-based frame (`0x3d7e92`/`93`) was removed in #194.\n\n**Server behavior:**\n- looks up the server candidate by address and port;\n- one punch packet per received packet;\n- 10 per second, using a fixed window (`QUIC_PUNCH_RATE_LIMIT_PER_WINDOW`);\n- refuses multicast, broadcast, unspecified, loopback and link-local destinations, plus seven sensitive ports;\n- the punch packet is random bytes behind a short header (not 1-RTT protected), at most min(request packet, 64) bytes.\n\n**Client behavior:** one request per packet, retransmitted if lost; waits smoothed RTT; probes from the candidate's local port (#199); retires the CID or abandons the path on failure.\n\n**Differences:** requests received before the handshake is confirmed are ignored. If several sending bases share an advertised address, the first match wins (the Appendix C open issue on multiple bases).\n\n**Maturity:** the netns NAT emulation from #195 is mentioned. \"Trial deployment\" is unchanged.\n\nThe old \"without padding\" note is gone. The punch packet isn't a protected packet any more, so the header-protection minimum doesn't apply.\n\nThe definition list is split into separate entries, because mmark doesn't support multi-paragraph definitions.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_017y5d6Q8X4o97d43Bb4XLhE\n",
+      "createdAt": "2026-11-13T20:03:10Z",
+      "updatedAt": "2026-11-13T20:26:18Z",
+      "baseRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "baseRefName": "main",
+      "baseRefOid": "0fe4d33459bbbe5f1f740c7252ac6f17ee5d18ed",
+      "headRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "headRefName": "update-impl-status",
+      "headRefOid": "7857e446e199361c00f6be4963f1e8e1e9f4261c",
+      "closedAt": "2026-11-13T20:26:13Z",
+      "mergedAt": "2026-11-13T20:26:13Z",
+      "mergedBy": "masa-koz",
+      "mergeCommit": {
+        "oid": "6926a8cf0714bfaa1e528807eb527f918421ea1c"
+      },
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 5,
+      "id": "PR_kwDOVmiEMs8AAAABPAvP7Q",
+      "title": "Ignore punch requests received before the handshake is confirmed",
+      "url": "https://github.com/masa-koz/draft-kozuka-quic-stateless-punch/pull/5",
+      "state": "MERGED",
+      "author": "masa-koz",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "Moves into the main text a restriction that SEERA MsQuic already implements (seera-networks/msquic#180).\n\n## Changes\n- **\u00a75 (Punch Requests):** the server MUST ignore a PUNCH_ME_NOW frame received before the handshake is confirmed (RFC 9001 \u00a74.1.2).\n  - Reason: 0-RTT data can be replayed (RFC 9001 \u00a79.2), and a replayed request would make the server punch toward an address the attacker chose.\n  - A legitimate client never sends one this early, because the extension isn't remembered for 0-RTT and the frame is sent only in 1-RTT packets (\u00a79).\n- **\u00a711 (Security Considerations):** one sentence on the replay case, pointing to \u00a75.\n- **Appendix B.1:** the item is no longer a difference. \"Differences\" now reads \"None known\"; it still notes that the server uses the first match when several sending bases share an address, which is a choice this document leaves open.\n\n## Notes for review\n- The rule is MUST-ignore, not a connection error. That matches the implementation and the draft's other \"ignore\" cases.\n- RFC 9001 \u00a75.7 already stops a server from processing 1-RTT packets before the handshake completes, which for a server is when it is confirmed. So in practice the rule matters only for frames arriving in 0-RTT. The draft still doesn't say what a receiver does with PUNCH_ME_NOW in a 0-RTT packet. RFC 9000 \u00a712.4 would make that PROTOCOL_VIOLATION, if the frame is listed as 1-RTT only. A follow-up could state this explicitly.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_017y5d6Q8X4o97d43Bb4XLhE\n",
+      "createdAt": "2026-11-13T20:28:57Z",
+      "updatedAt": "2026-11-13T20:34:00Z",
+      "baseRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "baseRefName": "main",
+      "baseRefOid": "6926a8cf0714bfaa1e528807eb527f918421ea1c",
+      "headRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "headRefName": "handshake-confirmed",
+      "headRefOid": "11d5557485c38ddad35707f60fc39850ed168baf",
+      "closedAt": "2026-11-13T20:33:55Z",
+      "mergedAt": "2026-11-13T20:33:55Z",
+      "mergedBy": "masa-koz",
+      "mergeCommit": {
+        "oid": "83bb529a66ccd8567a979a39de0a2ac3a7cb7b5a"
+      },
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 6,
+      "id": "PR_kwDOVmiEMs8AAAABPExs9A",
+      "title": "Set date for -00 submission",
+      "url": "https://github.com/masa-koz/draft-kozuka-quic-stateless-punch/pull/6",
+      "state": "MERGED",
+      "author": "masa-koz",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "Updates the front-matter `date` from 2026-11-07 to 2026-11-14, ahead of tagging `draft-kozuka-quic-stateless-punch-00`.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_017y5d6Q8X4o97d43Bb4XLhE",
+      "createdAt": "2026-11-14T03:15:56Z",
+      "updatedAt": "2026-11-14T03:16:56Z",
+      "baseRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "baseRefName": "main",
+      "baseRefOid": "83bb529a66ccd8567a979a39de0a2ac3a7cb7b5a",
+      "headRepository": "masa-koz/draft-kozuka-quic-stateless-punch",
+      "headRefName": "update-date",
+      "headRefOid": "df9a2de6883c853fd7c1f4561fc23de2b98293f5",
+      "closedAt": "2026-11-14T03:16:52Z",
+      "mergedAt": "2026-11-14T03:16:52Z",
+      "mergedBy": "masa-koz",
+      "mergeCommit": {
+        "oid": "934b59031f4b4ba341869e7457b876bc276d252c"
       },
       "comments": [],
       "reviews": []
